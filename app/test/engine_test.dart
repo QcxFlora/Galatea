@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:galatea_studio/engine/expr.dart';
 import 'package:galatea_studio/engine/vm.dart';
 import 'package:galatea_studio/models/graph.dart';
@@ -89,8 +91,7 @@ void main() {
     test('JSON 往返', () {
       final s = buildSample();
       final s2 = Story.fromJson(
-          Map<String, dynamic>.from(
-              (const JsonCodec()).decode(s.toPrettyJson()) as Map));
+          Map<String, dynamic>.from(jsonDecode(s.toPrettyJson()) as Map));
       expect(s2.nodes.length, s.nodes.length);
       expect(s2.start, 's1');
       expect(s2.toPrettyJson(), s.toPrettyJson());

@@ -63,11 +63,6 @@ ThemeData buildGalateaTheme(Brightness brightness) {
       displayColor: GColors.text,
     ),
     dividerColor: GColors.line,
-    cardTheme: const CardTheme(
-      color: GColors.panel,
-      elevation: 0,
-      margin: EdgeInsets.zero,
-    ),
     snackBarTheme: const SnackBarThemeData(
       backgroundColor: GColors.panel2,
       contentTextStyle: TextStyle(color: GColors.text),

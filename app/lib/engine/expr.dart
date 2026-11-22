@@ -329,8 +329,9 @@ class _ExprParser {
   _ExprParser(this.t);
 
   Expr? expr(int minPrec) {
-    var lhs = unary();
-    if (lhs == null) return null;
+    final first = unary();
+    if (first == null) return null;
+    Expr lhs = first;
     while (true) {
       if (i >= t.length) break;
       final tok = t[i];

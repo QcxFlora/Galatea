@@ -148,7 +148,12 @@ class Vm {
     (cur as Map)[parts.last] = v;
   }
 
-  bool evalCond(String src) => evalCondExpr(src, varValue);
+  bool evalCond(String src) {
+    if (src.trim().isEmpty) return true;
+    final e = parseExpr(src);
+    if (e == null) return false;
+    return truthy(evalExprTree(e, varValue));
+  }
 
   void _apply(List<Effect> effects) {
     for (final e in effects) {

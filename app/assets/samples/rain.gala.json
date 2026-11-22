@@ -1,0 +1,225 @@
+{
+  "characters": {
+    "hero": {
+      "color": "#9ecbff",
+      "name": "我"
+    },
+    "xiayu": {
+      "color": "#7aa2f7",
+      "name": "夏雨"
+    }
+  },
+  "format": "galatea.graph/1",
+  "meta": {
+    "author": "Galatea 示例",
+    "desc": "一个雨夜便利店的短篇。用来演示分支、条件、变量、子图与结局。",
+    "start": "n_open",
+    "title": "雨声与自动门",
+    "version": "0.1.0"
+  },
+  "nodes": [
+    {
+      "id": "n_open",
+      "next": "n_me",
+      "text": "雨下得很大。便利店的自动门隔一会儿就「叮咚」一声，然后什么人都没有进来。",
+      "type": "say",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "n_me",
+      "next": "n_welcome",
+      "speaker": "hero",
+      "text": "……伞忘在教室了。",
+      "type": "say",
+      "x": 0,
+      "y": 140
+    },
+    {
+      "id": "n_welcome",
+      "next": "n_choice1",
+      "speaker": "xiayu",
+      "text": "欢迎光临。……啊，是你。",
+      "type": "say",
+      "x": 0,
+      "y": 280
+    },
+    {
+      "id": "n_choice1",
+      "options": [
+        {
+          "effects": [
+            {
+              "expr": "1",
+              "op": "add",
+              "target": "aff"
+            }
+          ],
+          "text": "在店里等到雨停",
+          "to": "n_wait"
+        },
+        {
+          "text": "把书顶在头上跑回去",
+          "to": "n_run"
+        }
+      ],
+      "prompt": "怎么办？",
+      "title": "雨还没停",
+      "type": "choice",
+      "x": 0,
+      "y": 420
+    },
+    {
+      "id": "n_wait",
+      "next": "n_choice2",
+      "speaker": "xiayu",
+      "text": "这个点还没回去？外面的伞大概要卖完了。",
+      "type": "say",
+      "x": -260,
+      "y": 560
+    },
+    {
+      "id": "n_choice2",
+      "options": [
+        {
+          "cond": "aff >= 1",
+          "text": "「你有心事？」",
+          "to": "n_ask"
+        },
+        {
+          "text": "假装没注意到，继续翻杂志",
+          "to": "n_silent"
+        }
+      ],
+      "prompt": "她好像有话想说。",
+      "type": "choice",
+      "x": -260,
+      "y": 700
+    },
+    {
+      "id": "n_ask",
+      "next": "n_set",
+      "speaker": "xiayu",
+      "text": "……明天开始，我就不在这个班了。",
+      "type": "say",
+      "x": -420,
+      "y": 840
+    },
+    {
+      "effects": [
+        {
+          "expr": "true",
+          "op": "set",
+          "target": "know"
+        }
+      ],
+      "id": "n_set",
+      "next": "n_branch",
+      "title": "记下这件事",
+      "type": "set",
+      "x": -420,
+      "y": 980
+    },
+    {
+      "cond": "know && aff >= 1",
+      "id": "n_branch",
+      "no": "n_silent2",
+      "type": "branch",
+      "x": -420,
+      "y": 1120,
+      "yes": "n_truth"
+    },
+    {
+      "id": "n_truth",
+      "next": "n_call",
+      "speaker": "xiayu",
+      "text": "我攒够学费了。夜校，读一年半。",
+      "type": "say",
+      "x": -580,
+      "y": 1260
+    },
+    {
+      "id": "n_call",
+      "next": "n_end_farewell",
+      "title": "闪回",
+      "to": "n_flash",
+      "type": "call",
+      "x": -580,
+      "y": 1400
+    },
+    {
+      "id": "n_flash",
+      "next": "n_ret",
+      "text": "（去年冬天，她也是这样隔着收银台，把热可可推到我面前。）",
+      "type": "say",
+      "x": -820,
+      "y": 1540
+    },
+    {
+      "id": "n_ret",
+      "type": "return",
+      "x": -820,
+      "y": 1680
+    },
+    {
+      "id": "n_silent",
+      "next": "n_end_waiting",
+      "text": "我把硬币一枚一枚放进找零口，声音很响。",
+      "type": "say",
+      "x": -60,
+      "y": 840
+    },
+    {
+      "id": "n_silent2",
+      "next": "n_end_waiting",
+      "text": "我们都没再说话。雨声填满了整间店。",
+      "type": "say",
+      "x": -260,
+      "y": 1260
+    },
+    {
+      "id": "n_run",
+      "next": "n_run2",
+      "text": "我推开门，雨声一下子灌满耳朵。",
+      "type": "say",
+      "x": 300,
+      "y": 560
+    },
+    {
+      "id": "n_run2",
+      "next": "n_end_soaked",
+      "text": "跑过三个路口，浑身湿透，书页黏在一起。",
+      "type": "say",
+      "x": 300,
+      "y": 700
+    },
+    {
+      "ending": "farewell",
+      "id": "n_end_farewell",
+      "text": "结局 · 雨停之前：她把制服叠好放在柜台上，说明年春天见。",
+      "type": "end",
+      "x": -580,
+      "y": 1540
+    },
+    {
+      "ending": "waiting",
+      "id": "n_end_waiting",
+      "text": "结局 · 一直在等：雨停了，我什么也没问。",
+      "type": "end",
+      "x": -160,
+      "y": 1400
+    },
+    {
+      "ending": "soaked",
+      "id": "n_end_soaked",
+      "text": "结局 · 落汤鸡：第二天我发烧了，请了三天假。",
+      "type": "end",
+      "x": 300,
+      "y": 840
+    }
+  ],
+  "vars": {
+    "aff": 0,
+    "know": false
+  }
+}
