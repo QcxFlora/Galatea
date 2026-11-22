@@ -184,6 +184,91 @@ pub fn lint(story: &Story) -> Vec<Issue> {
             NodeKind::End { .. } => {
                 has_end_reachable_graph.insert(n.id.clone());
             }
+            NodeKind::Weight {
+                target,
+                amount,
+                cond,
+                next,
+            } => {
+                if target.trim().is_empty() {
+                    out.push(Issue {
+                        level: Level::Warning,
+                        node: Some(n.id.clone()),
+                        kind: "weight-target",
+                        msg: "加权块没有指定变量".into(),
+                    });
+                }
+                if amount.trim().is_empty() {
+                    out.push(Issue {
+                        level: Level::Warning,
+                        node: Some(n.id.clone()),
+                        kind: "weight-amount",
+                        msg: "加权块没有写权重表达式".into(),
+                    });
+                }
+                if !cond.trim().is_empty() && expr::parse(cond).is_err() {
+                    out.push(Issue {
+                        level: Level::Error,
+                        node: Some(n.id.clone()),
+                        kind: "bad-expr",
+                        msg: format!("加权条件写错了：{}", cond),
+                    });
+                }
+                if next.is_none() {
+                    out.push(Issue {
+                        level: Level::Warning,
+                        node: Some(n.id.clone()),
+                        kind: "dead-end",
+                        msg: "加权块后面没有连线".into(),
+                    });
+                }
+            }
+            NodeKind::Weighted { branches, .. } => {
+                if branches.is_empty() {
+                    out.push(Issue {
+                        level: Level::Error,
+                        node: Some(n.id.clone()),
+                        kind: "weighted-empty",
+                        msg: "加权分支一条路都没有".into(),
+                    });
+                }
+                let mut all_zero = true;
+                for (i, b) in branches.iter().enumerate() {
+                    if b.to.trim().is_empty() {
+                        out.push(Issue {
+                            level: Level::Error,
+                            node: Some(n.id.clone()),
+                            kind: "dangling",
+                            msg: format!("第 {} 条加权路线没有连线", i + 1),
+                        });
+                    }
+                    if expr::parse(&b.weight).is_err() {
+                        out.push(Issue {
+                            level: Level::Error,
+                            node: Some(n.id.clone()),
+                            kind: "bad-expr",
+                            msg: format!("第 {} 条路线的权重写错了：{}", i + 1, b.weight),
+                        });
+                    } else if let Ok(e) = expr::parse(&b.weight) {
+                        if e.is_const() {
+                            let v = crate::expr::to_num(&e.eval(&|_| crate::json::Json::Null));
+                            if v > 0.0 {
+                                all_zero = false;
+                            }
+                        } else {
+                            all_zero = false; // 动态权重，无法静态判断
+                        }
+                    }
+                }
+                if !branches.is_empty() && all_zero {
+                    out.push(Issue {
+                        level: Level::Warning,
+                        node: Some(n.id.clone()),
+                        kind: "weighted-zero",
+                        msg: "所有路线的权重都是 0，永远走不出去".into(),
+                    });
+                }
+            }
             NodeKind::Marker { tag, next } => {
                 if tag.trim().is_empty() {
                     out.push(Issue {

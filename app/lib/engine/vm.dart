@@ -59,6 +59,25 @@ class HaltEvent extends VmEvent {
   const HaltEvent(this.reason);
 }
 
+/// 确定性随机数（xorshift64*），与 Rust 侧同算法：
+/// 同一种子 + 同样调用次数 = 同样结果，所以存档里存下 state 就能复现。
+class Rng {
+  int state;
+  Rng(int seed) : state = seed == 0 ? 0x9E3779B97F4A7C15 : seed;
+
+  int nextU64() {
+    var x = state;
+    x ^= x >>> 12;
+    x ^= x << 25;
+    x ^= x >>> 27;
+    state = x;
+    return x * 0x2545F4914F6CDD1D;
+  }
+
+  /// [0, 1)
+  double nextF64() => (nextU64() >>> 11) / 9007199254740992.0;
+}
+
 class _Pending {
   final String node;
   final String prompt;
@@ -94,12 +113,15 @@ class Vm {
   String? endedEnding;
   String? endedText;
   int autoSteps = 0;
+  Rng rng = Rng(DateTime.now().microsecondsSinceEpoch);
 
   Vm(this.story)
       : pc = story.start.isEmpty ? null : story.start,
         vars = Map<String, Object?>.from(story.vars);
 
   void restart() {
+    // 每局换种子，一局之内确定
+    rng = Rng(rng.nextU64() ^ 0x5DEECE66D);
     pc = story.start.isEmpty ? null : story.start;
     vars = Map<String, Object?>.from(story.vars);
     stack.clear();
@@ -342,6 +364,39 @@ class Vm {
           _apply(node.effects);
           pc = node.next;
           break;
+        case NodeType.weight:
+          if (node.weightCond.trim().isEmpty || evalCond(node.weightCond)) {
+            final delta = toNum(evalExpr(node.weightAmount, varValue) ?? 0);
+            final cur = toNum(varValue(node.weightTarget));
+            setVar(node.weightTarget, cur + delta);
+          }
+          pc = node.next;
+          break;
+        case NodeType.weighted:
+          final pool = <List<Object>>[]; // [weight, to]
+          for (final b in node.branches) {
+            if (b.cond.trim().isNotEmpty && !evalCond(b.cond)) continue;
+            if (b.to.isEmpty) continue;
+            final w = toNum(evalExpr(b.weight, varValue) ?? 0);
+            if (w > 0) pool.add([w, b.to]);
+          }
+          if (pool.isEmpty) {
+            pc = null;
+            return HaltEvent('加权分支 `$id` 没有可用路线（权重全为 0 或条件全不满足）');
+          }
+          final total = pool.fold<double>(0, (a, e) => a + (e[0] as double));
+          var r = rng.nextF64() * total;
+          var chosen = pool.last[1] as String;
+          for (final e in pool) {
+            final w = e[0] as double;
+            if (r <= w) {
+              chosen = e[1] as String;
+              break;
+            }
+            r -= w;
+          }
+          pc = chosen;
+          break;
         case NodeType.jump:
           pc = node.to;
           break;
@@ -439,6 +494,8 @@ class Vm {
         'log': log,
         if (endedEnding != null)
           'ended': {'ending': endedEnding, 'text': endedText ?? ''},
+        // u64 超出 JSON double 精度，存字符串
+        'rng': rng.state.toString(),
       };
 
   void loadJson(Map<String, dynamic> j) {
@@ -466,6 +523,13 @@ class Vm {
       ..clear()
       ..addAll(
           (j['log'] is List) ? (j['log'] as List).map((e) => '$e') : const <String>[]);
+    final rngRaw = j['rng'];
+    if (rngRaw is String) {
+      final v = int.tryParse(rngRaw);
+      if (v != null) rng = Rng(v);
+    } else if (rngRaw is num) {
+      rng = Rng(rngRaw.toInt());
+    }
     final ended = j['ended'];
     if (ended is Map) {
       endedEnding = ended['ending'] as String?;

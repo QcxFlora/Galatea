@@ -65,6 +65,41 @@ impl Event {
     }
 }
 
+/// 确定性随机数（xorshift64*）：相同种子 + 相同调用次数 = 相同结果，
+/// 所以存档里存下 state 就能做到"读档后剧情走向不变"。
+#[derive(Debug, Clone)]
+pub struct Rng {
+    pub state: u64,
+}
+
+/// 每次启动换一个种子（同一局之内仍然确定）
+fn time_seed() -> u64 {
+    match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+        Ok(d) => (d.as_secs() << 20) ^ d.subsec_nanos() as u64,
+        Err(_) => 0x0DA7_A5EE_D,
+    }
+}
+
+impl Rng {
+    pub fn new(seed: u64) -> Self {
+        Rng {
+            state: if seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { seed },
+        }
+    }
+    pub fn next_u64(&mut self) -> u64 {
+        let mut x = self.state;
+        x ^= x >> 12;
+        x ^= x << 25;
+        x ^= x >> 27;
+        self.state = x;
+        x.wrapping_mul(0x2545_F491_4F6C_DD1D)
+    }
+    /// [0, 1)
+    pub fn next_f64(&mut self) -> f64 {
+        (self.next_u64() >> 11) as f64 / (1u64 << 53) as f64
+    }
+}
+
 #[derive(Debug, Clone)]
 struct Pending {
     node: String,
@@ -102,6 +137,8 @@ pub struct Vm {
     snapshots: Vec<Snapshot>,
     /// 本次运行中自动执行的节点数（用于诊断）
     pub auto_steps: u32,
+    /// 加权分支用的随机数（状态会存档）
+    pub rng: Rng,
     /// 已编译的自定义脚本缓存
     scripts: BTreeMap<String, Rc<Script>>,
     /// 脚本相对路径的基准目录（默认为当前工作目录）
@@ -128,6 +165,7 @@ impl Vm {
             ended: None,
             snapshots: Vec::new(),
             auto_steps: 0,
+            rng: Rng::new(time_seed()),
             scripts: BTreeMap::new(),
             script_base: std::env::current_dir()
                 .unwrap_or_else(|_| std::path::PathBuf::from(".")),
@@ -136,6 +174,9 @@ impl Vm {
 
     /// 从剧本的第一个节点开始
     pub fn restart(&mut self) {
+        // 每局换一个种子，但一局之内是确定的
+        let seed = self.rng.next_u64() ^ 0x5DEECE66D;
+        self.rng = Rng::new(seed);
         self.pc = if self.story.meta.start.is_empty() {
             None
         } else {
@@ -438,6 +479,61 @@ impl Vm {
                 | NodeKind::Label { next, .. } => {
                     self.pc = next;
                 }
+                // 加权块：满足条件就给变量加权
+                NodeKind::Weight {
+                    target,
+                    amount,
+                    cond,
+                    next,
+                } => {
+                    if cond.is_empty() || self.eval_cond(&cond) {
+                        let delta = self
+                            .eval_expr(&amount)
+                            .map(|v| crate::expr::to_num(&v))
+                            .unwrap_or(0.0);
+                        let cur = crate::expr::to_num(&self.var(&target));
+                        self.set_var(&target, Json::Num(cur + delta));
+                    }
+                    self.pc = next;
+                }
+                // 加权分支：按权重掷一次
+                NodeKind::Weighted { branches, .. } => {
+                    let mut pool: Vec<(f64, String)> = Vec::new();
+                    for b in &branches {
+                        if !b.cond.is_empty() && !self.eval_cond(&b.cond) {
+                            continue;
+                        }
+                        if b.to.is_empty() {
+                            continue;
+                        }
+                        let w = self
+                            .eval_expr(&b.weight)
+                            .map(|v| crate::expr::to_num(&v))
+                            .unwrap_or(0.0);
+                        if w > 0.0 {
+                            pool.push((w, b.to.clone()));
+                        }
+                    }
+                    if pool.is_empty() {
+                        return Event::Halt {
+                            reason: format!(
+                                "加权分支 `{}` 没有可用路线（权重全为 0 或条件全不满足）",
+                                pc
+                            ),
+                        };
+                    }
+                    let total: f64 = pool.iter().map(|(w, _)| *w).sum();
+                    let mut r = self.rng.next_f64() * total;
+                    let mut chosen = pool[pool.len() - 1].1.clone();
+                    for (w, to) in &pool {
+                        if r <= *w {
+                            chosen = to.clone();
+                            break;
+                        }
+                        r -= w;
+                    }
+                    self.pc = Some(chosen);
+                }
                 NodeKind::Jump { to } => {
                     self.pc = to;
                 }
@@ -635,6 +731,8 @@ impl Vm {
             "taken",
             Json::Arr(self.taken.iter().map(|s| Json::s(s.clone())).collect()),
         );
+        // u64 超出 f64 的 53 位精度，存字符串
+        o.set("rng", Json::s(self.rng.state.to_string()));
         o.set(
             "log",
             Json::Arr(self.log.iter().map(|s| Json::s(s.clone())).collect()),
@@ -681,6 +779,15 @@ impl Vm {
             .iter()
             .filter_map(|v| v.as_str().map(|s| s.to_string()))
             .collect();
+        if let Some(node) = j.get("rng") {
+            let seed = node
+                .as_str()
+                .and_then(|x| x.parse::<u64>().ok())
+                .or_else(|| node.as_f64().map(|x| x as u64));
+            if let Some(seed) = seed {
+                self.rng = Rng::new(seed);
+            }
+        }
         self.ended = j
             .get("ended")
             .map(|e| (e.s_or("ending", ""), e.s_or("text", "")));
@@ -839,5 +946,112 @@ mod tests {
             Event::Say { text, .. } => assert_eq!(text, "yes"),
             other => panic!("{:?}", other),
         }
+    }
+
+    #[test]
+    fn weight_and_weighted() {
+        let mut s = Story::new("t", "w1");
+        s.vars.insert("勇气".into(), Json::Num(0.0));
+        s.add_node(crate::graph::Node {
+            id: "w1".into(),
+            x: 0.0,
+            y: 0.0,
+            title: None,
+            kind: NodeKind::Weight {
+                target: "勇气".into(),
+                amount: "2".into(),
+                cond: String::new(),
+                next: Some("wb".into()),
+            },
+        });
+        s.add_node(crate::graph::Node {
+            id: "wb".into(),
+            x: 0.0,
+            y: 100.0,
+            title: None,
+            kind: NodeKind::Weighted {
+                prompt: String::new(),
+                branches: vec![
+                    crate::graph::WeightedBranch::new("a", "1"),
+                    crate::graph::WeightedBranch::new("b", "3"),
+                ],
+            },
+        });
+        s.add_node(Story::mk_say("a", 0.0, 200.0, None, "走到 A"));
+        s.add_node(Story::mk_say("b", 0.0, 200.0, None, "走到 B"));
+
+        let mut vm = Vm::new(s);
+        match vm.step() {
+            Event::Say { text, .. } => assert!(text == "走到 A" || text == "走到 B"),
+            other => panic!("{:?}", other),
+        }
+        // 加权块把勇气 +2 了
+        assert_eq!(vm.var("勇气"), Json::Num(2.0));
+    }
+
+    #[test]
+    fn weighted_respects_conditions_and_zero() {
+        let mut s = Story::new("t", "wb");
+        s.add_node(crate::graph::Node {
+            id: "wb".into(),
+            x: 0.0,
+            y: 0.0,
+            title: None,
+            kind: NodeKind::Weighted {
+                prompt: String::new(),
+                branches: vec![
+                    crate::graph::WeightedBranch {
+                        to: "a".into(),
+                        weight: "1".into(),
+                        cond: "假".into(), // 条件不满足 → 排除
+                    },
+                    crate::graph::WeightedBranch::new("b", "0"), // 权重 0 → 排除
+                    crate::graph::WeightedBranch::new("c", "5"),
+                ],
+            },
+        });
+        for id in ["a", "b", "c"] {
+            s.add_node(Story::mk_say(id, 0.0, 100.0, None, id));
+        }
+        let mut vm = Vm::new(s);
+        match vm.step() {
+            Event::Say { text, .. } => assert_eq!(text, "c"),
+            other => panic!("{:?}", other),
+        }
+    }
+
+    #[test]
+    fn save_restores_rng() {
+        // 存档 → 读出同样的 rng 状态 → 后续路线一致
+        let mut s = Story::new("t", "wb");
+        s.add_node(crate::graph::Node {
+            id: "wb".into(),
+            x: 0.0,
+            y: 0.0,
+            title: None,
+            kind: NodeKind::Weighted {
+                prompt: String::new(),
+                branches: vec![
+                    crate::graph::WeightedBranch::new("a", "1"),
+                    crate::graph::WeightedBranch::new("b", "1"),
+                ],
+            },
+        });
+        s.add_node(Story::mk_say("a", 0.0, 100.0, None, "A"));
+        s.add_node(Story::mk_say("b", 0.0, 100.0, None, "B"));
+
+        let mut vm = Vm::new(s.clone());
+        let first = match vm.step() {
+            Event::Say { text, .. } => text,
+            _ => panic!(),
+        };
+        let snap = vm.save_json();
+        let mut vm2 = Vm::new(s);
+        vm2.load(&snap).unwrap();
+        // 读档后 rng 状态一致：再掷一次结果应该可复现
+        let mut a = vm.rng.clone();
+        let mut b = vm2.rng.clone();
+        assert_eq!(a.next_u64(), b.next_u64());
+        assert!(first == "A" || first == "B");
     }
 }

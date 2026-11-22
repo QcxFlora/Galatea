@@ -14,7 +14,9 @@
     }
   },
   "vars": {
-    "撒谎次数": 0
+    "撒谎次数": 0,
+    "心虚": 0,
+    "疲惫": 0
   },
   "nodes": [
     {
@@ -170,7 +172,7 @@
       "x": -620,
       "y": 820,
       "text": "是吗。拿来我看。",
-      "next": "s5",
+      "next": "w_tired",
       "cast": [
         "m_kalts"
       ],
@@ -184,7 +186,7 @@
       "x": -620,
       "y": 1020,
       "text": "她翻了两页，眉毛慢慢抬了起来。",
-      "next": "s6"
+      "next": "wb_guess"
     },
     {
       "id": "s6",
@@ -209,7 +211,7 @@
       "options": [
         {
           "text": "「我可以解释。」",
-          "to": "s7"
+          "to": "wb_soft"
         },
         {
           "text": "（当场躺平）",
@@ -375,6 +377,57 @@
       "title": "背景 · 便利店夜",
       "asset": "assets/characters/amiya.webp",
       "scene": "便利店·夜"
+    },
+    {
+      "id": "w_tired",
+      "type": "weight",
+      "x": -920,
+      "y": 880,
+      "title": "加权 · 疲惫",
+      "target": "疲惫",
+      "amount": "2",
+      "cond": "撒谎次数 > 0",
+      "next": "s5"
+    },
+    {
+      "id": "wb_guess",
+      "type": "weighted",
+      "x": -920,
+      "y": 1080,
+      "title": "加权分支 · 能否糊弄过去",
+      "prompt": "",
+      "branches": [
+        {
+          "to": "s6",
+          "weight": "3 + 心虚",
+          "cond": ""
+        },
+        {
+          "to": "e1",
+          "weight": "1",
+          "cond": ""
+        }
+      ]
+    },
+    {
+      "id": "wb_soft",
+      "type": "weighted",
+      "x": -620,
+      "y": 1600,
+      "title": "加权分支 · 她信不信",
+      "prompt": "",
+      "branches": [
+        {
+          "to": "s7",
+          "weight": "疲惫",
+          "cond": ""
+        },
+        {
+          "to": "e1",
+          "weight": "4",
+          "cond": ""
+        }
+      ]
     }
   ],
   "groups": [
@@ -423,7 +476,10 @@
         "s11",
         "e1",
         "e2",
-        "e3"
+        "e3",
+        "w_tired",
+        "wb_guess",
+        "wb_soft"
       ],
       "color": "#19d1ff"
     }

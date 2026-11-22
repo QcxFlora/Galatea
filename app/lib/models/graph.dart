@@ -10,7 +10,9 @@ import 'dart:convert';
 
 enum NodeType { say, choice, branch, set, jump, call, ret, end, script,
   // v0.2：资源方块 + 标记名/显示名
-  character, portrait, background, marker, label }
+  character, portrait, background, marker, label,
+  // v0.2 加权
+  weight, weighted }
 
 String nodeTypeId(NodeType t) {
   switch (t) {
@@ -42,6 +44,10 @@ String nodeTypeId(NodeType t) {
       return 'marker';
     case NodeType.label:
       return 'label';
+    case NodeType.weight:
+      return 'weight';
+    case NodeType.weighted:
+      return 'weighted';
   }
 }
 
@@ -73,6 +79,10 @@ NodeType nodeTypeFrom(String? s) {
       return NodeType.marker;
     case 'label':
       return NodeType.label;
+    case 'weight':
+      return NodeType.weight;
+    case 'weighted':
+      return NodeType.weighted;
     default:
       return NodeType.say;
   }
@@ -108,6 +118,10 @@ String nodeTypeLabel(NodeType t) {
       return '标记名';
     case NodeType.label:
       return '显示名';
+    case NodeType.weight:
+      return '加权';
+    case NodeType.weighted:
+      return '加权分支';
   }
 }
 
@@ -141,6 +155,10 @@ String nodeTypeIcon(NodeType t) {
       return '🏷️';
     case NodeType.label:
       return 'Ａ';
+    case NodeType.weight:
+      return '⚖️';
+    case NodeType.weighted:
+      return '🎲';
   }
 }
 
@@ -234,6 +252,33 @@ class Effect {
 
 // ------------------------------------------------------------------ 选项
 
+/// 加权分支的一条路
+class WeightedBranch {
+  String to;
+  /// 权重表达式（可动态，如 `好感 * 2`；<=0 视为不可达）
+  String weight;
+  String cond;
+
+  WeightedBranch({this.to = '', this.weight = '1', this.cond = ''});
+
+  factory WeightedBranch.fromJson(dynamic j) {
+    final m = (j is Map) ? j : const {};
+    return WeightedBranch(
+      to: asString(m['to']),
+      weight: asString(m['weight'], fallback: '1'),
+      cond: asString(m['cond']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final m = <String, dynamic>{'to': to, 'weight': weight};
+    if (cond.trim().isNotEmpty) m['cond'] = cond;
+    return m;
+  }
+
+  WeightedBranch copy() => WeightedBranch(to: to, weight: weight, cond: cond);
+}
+
 class Choice {
   String text;
   String to;
@@ -319,6 +364,14 @@ class StoryNode {
   // 变量
   List<Effect> effects;
 
+  // 加权块
+  String weightTarget;
+  String weightAmount;
+  String weightCond;
+
+  // 加权分支
+  List<WeightedBranch> branches;
+
   // 结局
   String ending;
   String endText;
@@ -360,6 +413,10 @@ class StoryNode {
     this.code,
     this.entry = 'main',
     this.tag,
+    this.weightTarget = '',
+    this.weightAmount = '1',
+    this.weightCond = '',
+    List<WeightedBranch>? branches,
     List<String>? casts,
     List<String>? arts,
     List<String>? bgs,
@@ -369,6 +426,7 @@ class StoryNode {
     this.scene,
     List<String>? portraits,
   })  : portraits = portraits ?? <String>[],
+        branches = branches ?? <WeightedBranch>[],
         casts = casts ?? <String>[],
         arts = arts ?? <String>[],
         bgs = bgs ?? <String>[],
@@ -405,6 +463,12 @@ class StoryNode {
       code: asOptString(m['code']),
       entry: asString(m['entry'], fallback: 'main'),
       tag: asOptString(m['tag']) ?? asOptString(m['key']),
+      weightTarget: asString(m['target']),
+      weightAmount: asString(m['amount'], fallback: '1'),
+      weightCond: asString(m['cond']),
+      branches: (m['branches'] is List)
+          ? (m['branches'] as List).map(WeightedBranch.fromJson).toList()
+          : <WeightedBranch>[],
       casts: _strList(m['cast']),
       arts: _strList(m['art']),
       bgs: _strList(m['bg']),
@@ -446,6 +510,16 @@ class StoryNode {
       case NodeType.set:
         m['effects'] = effects.map((e) => e.toJson()).toList();
         if (next != null && next!.isNotEmpty) m['next'] = next;
+        break;
+      case NodeType.weight:
+        m['target'] = weightTarget;
+        m['amount'] = weightAmount;
+        if (weightCond.trim().isNotEmpty) m['cond'] = weightCond;
+        if (next != null && next!.isNotEmpty) m['next'] = next;
+        break;
+      case NodeType.weighted:
+        m['prompt'] = prompt;
+        m['branches'] = branches.map((b) => b.toJson()).toList();
         break;
       case NodeType.jump:
         if (to != null && to!.isNotEmpty) m['to'] = to;
@@ -519,6 +593,10 @@ class StoryNode {
         code: code,
         entry: entry,
         tag: tag,
+        weightTarget: weightTarget,
+        weightAmount: weightAmount,
+        weightCond: weightCond,
+        branches: branches.map((b) => b.copy()).toList(),
         casts: List<String>.from(casts),
         arts: List<String>.from(arts),
         bgs: List<String>.from(bgs),
@@ -554,6 +632,14 @@ class StoryNode {
       case NodeType.set:
       case NodeType.script:
         add('next', next);
+        break;
+      case NodeType.weight:
+        add('next', next);
+        break;
+      case NodeType.weighted:
+        for (var i = 0; i < branches.length; i++) {
+          add('w$i', branches[i].to);
+        }
         break;
       case NodeType.marker:
         // marker 的连线 = 指向「显示名」方块
@@ -601,6 +687,13 @@ class StoryNode {
       final i = int.tryParse(port.substring(port.startsWith('opt') ? 3 : 0));
       if (i != null && i >= 0 && i < options.length) {
         options[i].to = t ?? '';
+      }
+      return;
+    }
+    if (port.startsWith('w') && port.length > 1) {
+      final i = int.tryParse(port.substring(1));
+      if (i != null && i >= 0 && i < branches.length) {
+        branches[i].to = t ?? '';
       }
       return;
     }
@@ -691,6 +784,16 @@ class StoryNode {
         return '标记 ${tag ?? '（未命名）'}';
       case NodeType.label:
         return text.isEmpty ? '（显示名为空）' : text;
+      case NodeType.weight:
+        final amount = weightAmount.trim().isEmpty ? '1' : weightAmount.trim();
+        final sign = amount.startsWith('-') ? '' : '+';
+        final cond = weightCond.trim().isEmpty ? '' : ' 若 $weightCond';
+        return '$weightTarget $sign$amount$cond';
+      case NodeType.weighted:
+        if (branches.isEmpty) return '（还没有路线）';
+        return branches
+            .map((b) => '${b.weight}:${b.to.isEmpty ? "?" : b.to}')
+            .join('  ');
     }
   }
 
@@ -725,6 +828,10 @@ class StoryNode {
         return '标记名';
       case NodeType.label:
         return '显示名';
+      case NodeType.weight:
+        return '加权';
+      case NodeType.weighted:
+        return '加权分支';
     }
   }
 }

@@ -91,6 +91,33 @@ List<Issue> lintStory(Story story) {
           out.add(Issue(IssueLevel.error, n.id, 'dangling', '跳转目标为空'));
         }
         break;
+      case NodeType.weight:
+        if (n.weightTarget.trim().isEmpty) {
+          out.add(Issue(IssueLevel.warning, n.id, 'weight-target', '加权块没有指定变量'));
+        }
+        if (n.weightAmount.trim().isEmpty) {
+          out.add(Issue(IssueLevel.warning, n.id, 'weight-amount', '加权块没有写权重'));
+        }
+        if (n.next == null || n.next!.isEmpty) {
+          out.add(Issue(IssueLevel.warning, n.id, 'dead-end', '加权块后面没有连线'));
+        }
+        break;
+      case NodeType.weighted:
+        if (n.branches.isEmpty) {
+          out.add(Issue(IssueLevel.error, n.id, 'weighted-empty', '加权分支一条路都没有'));
+        }
+        for (var i = 0; i < n.branches.length; i++) {
+          final b = n.branches[i];
+          if (b.to.trim().isEmpty) {
+            out.add(Issue(IssueLevel.error, n.id, 'dangling',
+                '第 ${i + 1} 条加权路线没有连线'));
+          }
+          if (parseExpr(b.weight) == null) {
+            out.add(Issue(IssueLevel.error, n.id, 'bad-expr',
+                '第 ${i + 1} 条路线的权重写错了：${b.weight}'));
+          }
+        }
+        break;
       case NodeType.marker:
         if ((n.tag ?? '').trim().isEmpty) {
           out.add(Issue(IssueLevel.warning, n.id, 'marker-tag', '标记名方块缺 tag'));

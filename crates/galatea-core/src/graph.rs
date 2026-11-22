@@ -122,6 +122,26 @@ impl Effect {
     }
 }
 
+/// 加权分支的一条路
+#[derive(Debug, Clone)]
+pub struct WeightedBranch {
+    pub to: String,
+    /// 权重表达式（可动态，例如 `好感 * 2`；<=0 视为不可达）
+    pub weight: String,
+    /// 可选条件，不满足就直接排除
+    pub cond: String,
+}
+
+impl WeightedBranch {
+    pub fn new(to: &str, weight: &str) -> Self {
+        WeightedBranch {
+            to: to.to_string(),
+            weight: weight.to_string(),
+            cond: String::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Choice {
     pub text: String,
@@ -174,6 +194,20 @@ pub enum NodeKind {
     },
     /// 从子图返回
     Return,
+    /// 加权块：路过时给一个自定义变量加权（把「谁更偏向哪边」累计下来）
+    Weight {
+        target: String,
+        /// 加多少（表达式，可为负）
+        amount: String,
+        /// 可选条件：满足才加权
+        cond: String,
+        next: Option<String>,
+    },
+    /// 加权分支：按权重随机走一条
+    Weighted {
+        prompt: String,
+        branches: Vec<WeightedBranch>,
+    },
     /// 结局
     End { ending: String, text: String },
     /// 标记名：剧本内部引用的标识（不显示给玩家），例如 `amiya`
@@ -236,6 +270,8 @@ impl NodeKind {
             NodeKind::Background { .. } => "background",
             NodeKind::Marker { .. } => "marker",
             NodeKind::Label { .. } => "label",
+            NodeKind::Weight { .. } => "weight",
+            NodeKind::Weighted { .. } => "weighted",
         }
     }
 
@@ -255,6 +291,8 @@ impl NodeKind {
             NodeKind::Background { .. } => "#68d5ba",
             NodeKind::Marker { .. } => "#ffd166",
             NodeKind::Label { .. } => "#ffffff",
+            NodeKind::Weight { .. } => "#8fbcbb",
+            NodeKind::Weighted { .. } => "#d08770",
         }
     }
 }
@@ -340,6 +378,18 @@ impl Node {
                     v.push(("no".to_string(), n.clone()));
                 }
             }
+            NodeKind::Weight { next, .. } => {
+                if let Some(n) = next {
+                    v.push(("next".to_string(), n.clone()));
+                }
+            }
+            NodeKind::Weighted { branches, .. } => {
+                for (i, b) in branches.iter().enumerate() {
+                    if !b.to.is_empty() {
+                        v.push((format!("w{}", i), b.to.clone()));
+                    }
+                }
+            }
             NodeKind::Choice { options, .. } => {
                 for (i, o) in options.iter().enumerate() {
                     if !o.to.is_empty() {
@@ -405,6 +455,14 @@ impl Node {
             (NodeKind::Jump { to }, "to") => *to = target,
             (NodeKind::Call { to, .. }, "to") => *to = target,
             (NodeKind::Call { next, .. }, "back") => *next = target,
+            (NodeKind::Weight { next, .. }, "next") => *next = target,
+            (NodeKind::Weighted { branches, .. }, p) if p.starts_with('w') => {
+                if let Ok(i) = p[1..].parse::<usize>() {
+                    if let Some(b) = branches.get_mut(i) {
+                        b.to = target.unwrap_or_default();
+                    }
+                }
+            }
             (NodeKind::Choice { options, .. }, p) if p.starts_with("opt") => {
                 if let Ok(i) = p[3..].parse::<usize>() {
                     if let Some(o) = options.get_mut(i) {
@@ -576,6 +634,33 @@ impl Story {
                         Json::Arr(bg.iter().map(|x| Json::s(x.clone())).collect()),
                     );
                 }
+            }
+            NodeKind::Weight {
+                target,
+                amount,
+                cond,
+                next,
+            } => {
+                o.set("target", Json::s(target.clone()));
+                o.set("amount", Json::s(amount.clone()));
+                if !cond.is_empty() {
+                    o.set("cond", Json::s(cond.clone()));
+                }
+                opt(next, "next", &mut o);
+            }
+            NodeKind::Weighted { prompt, branches } => {
+                o.set("prompt", Json::s(prompt.clone()));
+                let mut arr = Json::arr();
+                for b in branches {
+                    let mut bo = Json::obj();
+                    bo.set("to", Json::s(b.to.clone()));
+                    bo.set("weight", Json::s(b.weight.clone()));
+                    if !b.cond.is_empty() {
+                        bo.set("cond", Json::s(b.cond.clone()));
+                    }
+                    arr.push(bo);
+                }
+                o.set("branches", arr);
             }
             NodeKind::Choice { prompt, options } => {
                 o.set("prompt", Json::s(prompt.clone()));
@@ -838,6 +923,26 @@ impl Story {
                     ending: nj.s_or("ending", "end"),
                     text: nj.s_or("text", ""),
                 },
+                "weight" => NodeKind::Weight {
+                    target: nj.s_or("target", "权重"),
+                    amount: nj.s_or("amount", "1"),
+                    cond: nj.s_or("cond", ""),
+                    next: nj.opt_str("next").filter(|s| !s.is_empty()),
+                },
+                "weighted" => {
+                    let mut branches = Vec::new();
+                    for bj in nj.arr_or_empty("branches") {
+                        branches.push(WeightedBranch {
+                            to: bj.s_or("to", ""),
+                            weight: bj.s_or("weight", "1"),
+                            cond: bj.s_or("cond", ""),
+                        });
+                    }
+                    NodeKind::Weighted {
+                        prompt: nj.s_or("prompt", ""),
+                        branches,
+                    }
+                }
                 "marker" => NodeKind::Marker {
                     tag: nj.s_or("tag", &id),
                     next: nj.opt_str("next").filter(|s| !s.is_empty()),
