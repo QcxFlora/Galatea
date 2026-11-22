@@ -62,8 +62,13 @@ func _next() -> void:
 		"ending":
 			_show_ending(ev)
 		"script":
-			# 脚本节点的 emit 可以驱动 3D：比如相机抖动、物体旋转
-			_apply_emits(ev.get("emits", {}))
+			# 脚本块有两条路：
+			#   engine=rust  → 已由 Rust 解释器执行完，这里只消费 emit
+			#   engine=godot → 由本运行时加载 GDScript 并 await 它跑完
+			if str(ev.get("engine", "rust")) == "godot":
+				await _run_godot_script(ev)
+			else:
+				_apply_emits(ev.get("emits", {}))
 			_next()
 		"halt":
 			dialog.text = "（停下：%s）" % ev.get("reason", "")
@@ -112,7 +117,10 @@ func _on_choice(index: int) -> void:
 		"choices": _show_choices(ev)
 		"ending": _show_ending(ev)
 		"script":
-			_apply_emits(ev.get("emits", {}))
+			if str(ev.get("engine", "rust")) == "godot":
+				await _run_godot_script(ev)
+			else:
+				_apply_emits(ev.get("emits", {}))
 			_next()
 		_: _next()
 
@@ -183,3 +191,39 @@ func _unhandled_input(event: InputEvent) -> void:
 			typing = false
 		elif options_box.get_child_count() == 0:
 			_next()
+
+## ─────────────────────────────────────────────────────────────
+## GDScript 脚本块：脚本作者可以直接写小游戏
+##
+## scripts/minigame.gd：
+##     extends RefCounted
+##     func start(ctx: Node) -> void:
+##         # 想做什么都行：生成 3D 物体、接碰撞、放音乐…
+##         await ctx.get_tree().create_timer(2.0).timeout
+##
+## 约定：入口函数可以是普通函数，也可以是协程（内部 await）；
+## 协程会等它真正结束再推进剧情。
+## ─────────────────────────────────────────────────────────────
+func _run_godot_script(ev: Dictionary) -> void:
+	var path := str(ev.get("src", ""))
+	var entry := str(ev.get("entry", "start"))
+	if path == "":
+		push_warning("[galatea] 脚本块没有 src")
+		return
+	if not ResourceLoader.exists(path):
+		push_warning("[galatea] 找不到脚本：" + path)
+		return
+	var script: Script = load(path)
+	if script == null:
+		push_warning("[galatea] 无法加载：" + path)
+		return
+	var inst = script.new()
+	if inst == null:
+		push_warning("[galatea] 无法实例化：" + path)
+		return
+	if inst is Object and not inst.has_method(entry):
+		push_warning("[galatea] %s 没有方法 %s" % [path, entry])
+		return
+	var result = inst.call(entry, rt)
+	if result is Signal:
+		await result

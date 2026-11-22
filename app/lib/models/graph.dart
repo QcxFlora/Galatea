@@ -380,6 +380,8 @@ class StoryNode {
   String? src;
   String? code;
   String entry;
+  /// 脚本引擎：'rust'（内置沙箱解释器）或 'godot'（GDScript，需 Godot 运行时）
+  String scriptEngine;
 
   // v0.2 资源方块
   String? tag; // marker：标记名
@@ -412,6 +414,7 @@ class StoryNode {
     this.src,
     this.code,
     this.entry = 'main',
+    this.scriptEngine = 'rust',
     this.tag,
     this.weightTarget = '',
     this.weightAmount = '1',
@@ -462,6 +465,7 @@ class StoryNode {
       src: asOptString(m['src']),
       code: asOptString(m['code']),
       entry: asString(m['entry'], fallback: 'main'),
+      scriptEngine: asString(m['engine'], fallback: 'rust'),
       tag: asOptString(m['tag']) ?? asOptString(m['key']),
       weightTarget: asString(m['target']),
       weightAmount: asString(m['amount'], fallback: '1'),
@@ -535,6 +539,7 @@ class StoryNode {
         if (endText.isNotEmpty) m['text'] = endText;
         break;
       case NodeType.script:
+        m['engine'] = scriptEngine;
         if (src != null && src!.isNotEmpty) m['src'] = src;
         if (code != null && code!.isNotEmpty) m['code'] = code;
         m['entry'] = entry.isEmpty ? 'main' : entry;
@@ -592,6 +597,7 @@ class StoryNode {
         src: src,
         code: code,
         entry: entry,
+        scriptEngine: scriptEngine,
         tag: tag,
         weightTarget: weightTarget,
         weightAmount: weightAmount,
@@ -773,7 +779,8 @@ class StoryNode {
       case NodeType.end:
         return endText.isEmpty ? ending : endText;
       case NodeType.script:
-        return '${src ?? '内联脚本'} → ${entry}()';
+        final tag = scriptEngine == 'godot' ? 'GD' : 'RS';
+        return '[$tag] ${src ?? '内联'} → ${entry}()';
       case NodeType.character:
         return '角色 $title · ${portraits.length} 张立绘';
       case NodeType.portrait:

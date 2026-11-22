@@ -275,7 +275,7 @@
       "x": 40,
       "y": 1420,
       "text": "后来我被送进了体检室。凯尔希亲自给我做了 47 项检查，一项都没落下。",
-      "next": "e3"
+      "next": "s_minigame"
     },
     {
       "id": "e1",
@@ -428,6 +428,17 @@
           "cond": ""
         }
       ]
+    },
+    {
+      "id": "s_minigame",
+      "type": "script",
+      "engine": "godot",
+      "x": 40,
+      "y": 1520,
+      "title": "小游戏 · 接住方块",
+      "src": "res://scripts/minigame.gd",
+      "entry": "start",
+      "next": "e3"
     }
   ],
   "groups": [
@@ -479,7 +490,8 @@
         "e3",
         "w_tired",
         "wb_guess",
-        "wb_soft"
+        "wb_soft",
+        "s_minigame"
       ],
       "color": "#19d1ff"
     }

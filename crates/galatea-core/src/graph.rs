@@ -122,6 +122,30 @@ impl Effect {
     }
 }
 
+/// 脚本块用哪个引擎跑
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScriptEngine {
+    /// 引擎内置的 Rust 安全子集解释器：零依赖、可测试、任何运行时都能跑
+    Rust,
+    /// Godot 的 GDScript：完整能力（3D、物理、动画），只有 Godot 运行时能跑
+    Godot,
+}
+
+impl ScriptEngine {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ScriptEngine::Rust => "rust",
+            ScriptEngine::Godot => "godot",
+        }
+    }
+    pub fn from_str(s: &str) -> ScriptEngine {
+        match s {
+            "godot" | "gdscript" | "gd" => ScriptEngine::Godot,
+            _ => ScriptEngine::Rust,
+        }
+    }
+}
+
 /// 加权分支的一条路
 #[derive(Debug, Clone)]
 pub struct WeightedBranch {
@@ -243,9 +267,11 @@ pub enum NodeKind {
         scene: Option<String>,
         next: Option<String>,
     },
-    /// 自定义 Rust 脚本：执行一段自己的逻辑（动画曲线 / 首界面 / 小游戏）
-    /// `code` 是内联源码，`src` 是相对路径（二选一）
+    /// 自定义脚本：跑一段自己的逻辑（动画曲线 / 首界面 / 小游戏）
+    /// `engine` 决定由谁来执行：Rust 沙箱解释器，还是 Godot 的 GDScript。
+    /// `code` 是内联源码，`src` 是路径（二选一）
     Script {
+        engine: ScriptEngine,
         code: Option<String>,
         src: Option<String>,
         entry: String,
@@ -752,11 +778,13 @@ impl Story {
                 opt(next, "next", &mut o);
             }
             NodeKind::Script {
+                engine,
                 code,
                 src,
                 entry,
                 next,
             } => {
+                o.set("engine", Json::s(engine.as_str()));
                 if let Some(c) = code {
                     o.set("code", Json::s(c.clone()));
                 }
@@ -906,6 +934,7 @@ impl Story {
                     next: nj.opt_str("next").filter(|s| !s.is_empty()),
                 },
                 "script" => NodeKind::Script {
+                    engine: ScriptEngine::from_str(&nj.s_or("engine", "rust")),
                     code: nj.opt_str("code"),
                     src: nj.opt_str("src"),
                     entry: {

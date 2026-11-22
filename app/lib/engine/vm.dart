@@ -419,9 +419,13 @@ class Vm {
           pc = node.next;
           break;
         case NodeType.script:
-          // Dart 侧不执行 Rust 脚本（由 FFI 的 Rust VM 负责）；
-          // 编辑器里跳过并留一条记录，保证图还能玩通。
-          log.add('（⚙ 脚本节点 ${node.entry}()：编辑器内试玩跳过自定义脚本）');
+          // 编辑器内不执行自定义脚本（Rust 沙箱与 GDScript 都不跑），
+          // 只留一条记录，保证图还能玩通。
+          if (node.scriptEngine == 'godot') {
+            log.add('（⚙ GDScript 节点 ${node.entry}()：需要 Godot 运行时）');
+          } else {
+            log.add('（⚙ Rust 脚本节点 ${node.entry}()：编辑器内跳过）');
+          }
           pc = node.next;
           break;
         case NodeType.end:

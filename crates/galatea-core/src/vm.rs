@@ -48,9 +48,13 @@ pub enum Event {
     Halt {
         reason: String,
     },
-    /// 执行了一个自定义 Rust 脚本节点
+    /// 执行了一个自定义脚本节点
     Script {
         node: String,
+        /// "rust" | "godot"
+        engine: String,
+        /// godot 引擎时的脚本路径
+        src: Option<String>,
         entry: String,
         /// 脚本返回值
         ret: Json,
@@ -550,11 +554,24 @@ impl Vm {
                     self.pc = self.stack.pop().flatten();
                 }
                 NodeKind::Script {
+                    engine,
                     code,
                     src,
                     entry,
                     next,
                 } => {
+                    // Godot 脚本：不由本 VM 执行，抛给运行时（Godot 侧 await 完再 advance）
+                    if engine == crate::graph::ScriptEngine::Godot {
+                        self.pc = next;
+                        return Event::Script {
+                            node: pc,
+                            engine: "godot".to_string(),
+                            src: src.clone(),
+                            entry,
+                            ret: Json::Null,
+                            emits: BTreeMap::new(),
+                        };
+                    }
                     let key = match (&src, &code) {
                         (Some(s), _) => format!("file:{}", s),
                         (None, Some(c)) => {
@@ -602,6 +619,8 @@ impl Vm {
                             self.pc = next;
                             return Event::Script {
                                 node: pc,
+                                engine: "rust".to_string(),
+                                src: None,
                                 entry,
                                 ret,
                                 emits,
