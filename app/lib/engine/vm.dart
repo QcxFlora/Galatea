@@ -364,13 +364,21 @@ class Vm {
           _apply(node.effects);
           pc = node.next;
           break;
-        case NodeType.weight:
-          if (node.weightCond.trim().isEmpty || evalCond(node.weightCond)) {
-            final delta = toNum(evalExpr(node.weightAmount, varValue) ?? 0);
-            final cur = toNum(varValue(node.weightTarget));
-            setVar(node.weightTarget, cur + delta);
+        case NodeType.variable:
+          // 变量块：把 add 端口连着的值块累加进变量
+          for (final vid in node.varAdd) {
+            final vn = story.nodeById(vid);
+            if (vn != null && vn.type == NodeType.value) {
+              final delta = toNum(evalExpr(vn.text, varValue) ?? 0);
+              final cur = toNum(varValue(node.text));
+              setVar(node.text, cur + delta);
+            }
           }
           pc = node.next;
+          break;
+        case NodeType.value:
+          // 值块是数据，不进流程
+          pc = null;
           break;
         case NodeType.weighted:
           final pool = <List<Object>>[]; // [weight, to]

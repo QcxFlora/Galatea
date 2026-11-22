@@ -235,17 +235,18 @@ mod tests {
         // 标记名 → 显示名：同一个 tag 在不同场景可以显示成不同文字
         let src = r#"{
           "nodes":[
-            {"id":"m1","type":"marker","tag":"amiya","next":"l1"},
-            {"id":"l1","type":"label","text":"阿米娅"},
-            {"id":"m2","type":"marker","tag":"amiya","next":"l2"},
-            {"id":"l2","type":"label","text":"？？？"}
+            {"id":"m1","type":"label","tag":"amiya","text":"阿米娅"},
+            {"id":"m2","type":"label","tag":"amiya","text":"？？？"}
           ]}"#;
         let story = crate::graph::Story::from_json_str(src).unwrap();
         match &story.node("m1").unwrap().kind {
-            crate::graph::NodeKind::Marker { tag, .. } => assert_eq!(tag, "amiya"),
+            crate::graph::NodeKind::Label { tag, text, .. } => {
+                assert_eq!(tag.as_deref(), Some("amiya"));
+                assert_eq!(text, "阿米娅");
+            }
             _ => panic!(),
         }
-        match &story.node("l2").unwrap().kind {
+        match &story.node("m2").unwrap().kind {
             crate::graph::NodeKind::Label { text, .. } => assert_eq!(text, "？？？"),
             _ => panic!(),
         }

@@ -11,8 +11,8 @@ import 'dart:convert';
 enum NodeType { say, choice, branch, set, jump, call, ret, end, script,
   // v0.2：资源方块 + 标记名/显示名
   character, portrait, background, marker, label,
-  // v0.2 加权
-  weight, weighted }
+  // v0.3 加权（值块 / 变量块 / 加权分支）
+  value, variable, weighted }
 
 String nodeTypeId(NodeType t) {
   switch (t) {
@@ -44,8 +44,10 @@ String nodeTypeId(NodeType t) {
       return 'marker';
     case NodeType.label:
       return 'label';
-    case NodeType.weight:
-      return 'weight';
+    case NodeType.value:
+      return 'value';
+    case NodeType.variable:
+      return 'variable';
     case NodeType.weighted:
       return 'weighted';
   }
@@ -79,8 +81,10 @@ NodeType nodeTypeFrom(String? s) {
       return NodeType.marker;
     case 'label':
       return NodeType.label;
-    case 'weight':
-      return NodeType.weight;
+    case 'value':
+      return NodeType.value;
+    case 'variable':
+      return NodeType.variable;
     case 'weighted':
       return NodeType.weighted;
     default:
@@ -118,8 +122,10 @@ String nodeTypeLabel(NodeType t) {
       return '标记名';
     case NodeType.label:
       return '显示名';
-    case NodeType.weight:
-      return '加权';
+    case NodeType.value:
+      return '值';
+    case NodeType.variable:
+      return '变量';
     case NodeType.weighted:
       return '加权分支';
   }
@@ -155,8 +161,10 @@ String nodeTypeIcon(NodeType t) {
       return '🏷️';
     case NodeType.label:
       return 'Ａ';
-    case NodeType.weight:
-      return '⚖️';
+    case NodeType.value:
+      return '#';
+    case NodeType.variable:
+      return '𝑥';
     case NodeType.weighted:
       return '🎲';
   }
@@ -364,10 +372,8 @@ class StoryNode {
   // 变量
   List<Effect> effects;
 
-  // 加权块
-  String weightTarget;
-  String weightAmount;
-  String weightCond;
+  // 变量块的 add 端口（连值块，可多个）
+  List<String> varAdd;
 
   // 加权分支
   List<WeightedBranch> branches;
@@ -416,9 +422,7 @@ class StoryNode {
     this.entry = 'main',
     this.scriptEngine = 'rust',
     this.tag,
-    this.weightTarget = '',
-    this.weightAmount = '1',
-    this.weightCond = '',
+    List<String>? varAdd,
     List<WeightedBranch>? branches,
     List<String>? casts,
     List<String>? arts,
@@ -429,6 +433,7 @@ class StoryNode {
     this.scene,
     List<String>? portraits,
   })  : portraits = portraits ?? <String>[],
+        varAdd = varAdd ?? <String>[],
         branches = branches ?? <WeightedBranch>[],
         casts = casts ?? <String>[],
         arts = arts ?? <String>[],
@@ -445,7 +450,10 @@ class StoryNode {
       y: asDouble(m['y']),
       title: asOptString(m['title']),
       speaker: asOptString(m['speaker']),
-      text: asString(m['text']),
+      // 变量块的变量名存在 name 里，其他块用 text
+      text: nodeTypeFrom(m['type'] as String?) == NodeType.variable
+          ? asString(m['name'])
+          : asString(m['text']),
       bg: asOptString(m['bg']),
       portrait: asOptString(m['portrait']),
       next: asOptString(m['next']),
@@ -467,9 +475,7 @@ class StoryNode {
       entry: asString(m['entry'], fallback: 'main'),
       scriptEngine: asString(m['engine'], fallback: 'rust'),
       tag: asOptString(m['tag']) ?? asOptString(m['key']),
-      weightTarget: asString(m['target']),
-      weightAmount: asString(m['amount'], fallback: '1'),
-      weightCond: asString(m['cond']),
+      varAdd: _strList(m['add']),
       branches: (m['branches'] is List)
           ? (m['branches'] as List).map(WeightedBranch.fromJson).toList()
           : <WeightedBranch>[],
@@ -515,10 +521,12 @@ class StoryNode {
         m['effects'] = effects.map((e) => e.toJson()).toList();
         if (next != null && next!.isNotEmpty) m['next'] = next;
         break;
-      case NodeType.weight:
-        m['target'] = weightTarget;
-        m['amount'] = weightAmount;
-        if (weightCond.trim().isNotEmpty) m['cond'] = weightCond;
+      case NodeType.value:
+        m['expr'] = text.isEmpty ? '1' : text;
+        break;
+      case NodeType.variable:
+        m['name'] = text;
+        if (varAdd.isNotEmpty) m['add'] = varAdd;
         if (next != null && next!.isNotEmpty) m['next'] = next;
         break;
       case NodeType.weighted:
@@ -599,9 +607,7 @@ class StoryNode {
         entry: entry,
         scriptEngine: scriptEngine,
         tag: tag,
-        weightTarget: weightTarget,
-        weightAmount: weightAmount,
-        weightCond: weightCond,
+        varAdd: List<String>.from(varAdd),
         branches: branches.map((b) => b.copy()).toList(),
         casts: List<String>.from(casts),
         arts: List<String>.from(arts),
@@ -639,7 +645,12 @@ class StoryNode {
       case NodeType.script:
         add('next', next);
         break;
-      case NodeType.weight:
+      case NodeType.value:
+        break; // 值块没有出口
+      case NodeType.variable:
+        for (final a in varAdd) {
+          add('add', a);
+        }
         add('next', next);
         break;
       case NodeType.weighted:
@@ -700,6 +711,14 @@ class StoryNode {
       final i = int.tryParse(port.substring(1));
       if (i != null && i >= 0 && i < branches.length) {
         branches[i].to = t ?? '';
+      }
+      return;
+    }
+    if (port == 'add') {
+      if (t == null) {
+        varAdd.clear();
+      } else if (!varAdd.contains(t)) {
+        varAdd.add(t);
       }
       return;
     }
@@ -791,11 +810,10 @@ class StoryNode {
         return '标记 ${tag ?? '（未命名）'}';
       case NodeType.label:
         return text.isEmpty ? '（显示名为空）' : text;
-      case NodeType.weight:
-        final amount = weightAmount.trim().isEmpty ? '1' : weightAmount.trim();
-        final sign = amount.startsWith('-') ? '' : '+';
-        final cond = weightCond.trim().isEmpty ? '' : ' 若 $weightCond';
-        return '$weightTarget $sign$amount$cond';
+      case NodeType.value:
+        return text.isEmpty ? '（空值）' : '= $text';
+      case NodeType.variable:
+        return varAdd.isEmpty ? '${text}（没连值块）' : '${text} ← ${varAdd.length} 个值';
       case NodeType.weighted:
         if (branches.isEmpty) return '（还没有路线）';
         return branches
@@ -835,8 +853,10 @@ class StoryNode {
         return '标记名';
       case NodeType.label:
         return '显示名';
-      case NodeType.weight:
-        return '加权';
+      case NodeType.value:
+        return '值';
+      case NodeType.variable:
+        return '变量';
       case NodeType.weighted:
         return '加权分支';
     }

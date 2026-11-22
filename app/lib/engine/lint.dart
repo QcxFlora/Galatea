@@ -91,15 +91,34 @@ List<Issue> lintStory(Story story) {
           out.add(Issue(IssueLevel.error, n.id, 'dangling', '跳转目标为空'));
         }
         break;
-      case NodeType.weight:
-        if (n.weightTarget.trim().isEmpty) {
-          out.add(Issue(IssueLevel.warning, n.id, 'weight-target', '加权块没有指定变量'));
+      case NodeType.variable:
+        if (n.text.trim().isEmpty) {
+          out.add(Issue(IssueLevel.warning, n.id, 'var-name', '变量块没有变量名'));
         }
-        if (n.weightAmount.trim().isEmpty) {
-          out.add(Issue(IssueLevel.warning, n.id, 'weight-amount', '加权块没有写权重'));
+        if (n.varAdd.isEmpty) {
+          out.add(Issue(IssueLevel.warning, n.id, 'var-add',
+              '变量 `${n.text}` 没有连值块（不会加到任何值）'));
+        }
+        for (final vid in n.varAdd) {
+          final vn = story.nodeById(vid);
+          if (vn == null) {
+            out.add(Issue(IssueLevel.error, n.id, 'dangling',
+                'add 端口连向了不存在的方块 `$vid`'));
+          } else if (vn.type != NodeType.value) {
+            out.add(Issue(IssueLevel.warning, n.id, 'var-add-target',
+                '变量块的 add 端口应该连「值块」'));
+          }
         }
         if (n.next == null || n.next!.isEmpty) {
-          out.add(Issue(IssueLevel.warning, n.id, 'dead-end', '加权块后面没有连线'));
+          out.add(Issue(IssueLevel.warning, n.id, 'dead-end', '变量块后面没有连线'));
+        }
+        break;
+      case NodeType.value:
+        if (n.text.trim().isEmpty) {
+          out.add(Issue(IssueLevel.warning, n.id, 'value-empty', '值块是空的'));
+        } else if (parseExpr(n.text) == null) {
+          out.add(Issue(IssueLevel.error, n.id, 'bad-expr',
+              '值块表达式写错了：${n.text}'));
         }
         break;
       case NodeType.weighted:

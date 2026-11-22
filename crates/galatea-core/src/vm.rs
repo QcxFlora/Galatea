@@ -378,10 +378,11 @@ impl Vm {
                         };
                         let key = match &cn.kind {
                             NodeKind::Character { key, .. } => key.clone(),
-                            NodeKind::Marker { tag, .. } => tag.clone(),
-                            NodeKind::Label { .. } => {
-                                // 直接连了显示名
-                                if let NodeKind::Label { text, .. } = &cn.kind {
+                            // 显示块带 tag：当作"内部标识"，继续走名字解析
+                            NodeKind::Label { tag: Some(t), .. } => t.clone(),
+                            // 显示块没 tag：它本身就是名字，直接用
+                            NodeKind::Label { text, .. } => {
+                                if !text.is_empty() && !names.contains(text) {
                                     names.push(text.clone());
                                 }
                                 continue;
@@ -479,26 +480,27 @@ impl Vm {
                 NodeKind::Character { next, .. }
                 | NodeKind::Portrait { next, .. }
                 | NodeKind::Background { next, .. }
-                | NodeKind::Marker { next, .. }
                 | NodeKind::Label { next, .. } => {
                     self.pc = next;
                 }
-                // 加权块：满足条件就给变量加权
-                NodeKind::Weight {
-                    target,
-                    amount,
-                    cond,
-                    next,
-                } => {
-                    if cond.is_empty() || self.eval_cond(&cond) {
-                        let delta = self
-                            .eval_expr(&amount)
-                            .map(|v| crate::expr::to_num(&v))
-                            .unwrap_or(0.0);
-                        let cur = crate::expr::to_num(&self.var(&target));
-                        self.set_var(&target, Json::Num(cur + delta));
+                // 变量块：把 add 端口连着的值块累加进变量
+                NodeKind::Variable { name, add, next } => {
+                    for vid in &add {
+                        let Some(vn) = self.story.node(vid) else { continue };
+                        if let NodeKind::Value { expr } = &vn.kind {
+                            let delta = self
+                                .eval_expr(expr)
+                                .map(|v| crate::expr::to_num(&v))
+                                .unwrap_or(0.0);
+                            let cur = crate::expr::to_num(&self.var(&name));
+                            self.set_var(&name, Json::Num(cur + delta));
+                        }
                     }
                     self.pc = next;
+                }
+                // 值块本身只是数据，不进流程
+                NodeKind::Value { .. } => {
+                    self.pc = None;
                 }
                 // 加权分支：按权重掷一次
                 NodeKind::Weighted { branches, .. } => {
@@ -662,18 +664,11 @@ impl Vm {
                         portrait.or_else(|| c.avatar.clone()),
                     );
                 }
-                // 2. 标记名方块：顺着 next 连到的「显示名」方块取文字
+                // 2. 显示块：tag 匹配就直接用它的 text
                 for n in &self.story.nodes {
-                    if let NodeKind::Marker { tag, next } = &n.kind {
-                        if tag == k || &n.id == k {
-                            if let Some(lid) = next {
-                                if let Some(ln) = self.story.node(lid) {
-                                    if let NodeKind::Label { text, .. } = &ln.kind {
-                                        return (text.clone(), None, portrait);
-                                    }
-                                }
-                            }
-                            return (tag.clone(), None, portrait);
+                    if let NodeKind::Label { tag: Some(t), text, .. } = &n.kind {
+                        if t == k || &n.id == k {
+                            return (text.clone(), None, portrait);
                         }
                     }
                 }
@@ -976,11 +971,19 @@ mod tests {
             x: 0.0,
             y: 0.0,
             title: None,
-            kind: NodeKind::Weight {
-                target: "勇气".into(),
-                amount: "2".into(),
-                cond: String::new(),
+            kind: NodeKind::Variable {
+                name: "勇气".into(),
+                add: vec!["v1".into()],
                 next: Some("wb".into()),
+            },
+        });
+        s.add_node(crate::graph::Node {
+            id: "v1".into(),
+            x: 0.0,
+            y: 50.0,
+            title: None,
+            kind: NodeKind::Value {
+                expr: "2".into(),
             },
         });
         s.add_node(crate::graph::Node {

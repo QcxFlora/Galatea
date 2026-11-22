@@ -303,12 +303,13 @@
     },
     {
       "id": "m_amiya",
-      "type": "marker",
+      "type": "label",
       "x": -1160,
       "y": 900,
       "title": "标记名 amiya",
       "tag": "amiya",
-      "next": "l_amiya"
+      "next": "l_amiya",
+      "text": "amiya"
     },
     {
       "id": "l_amiya",
@@ -320,12 +321,13 @@
     },
     {
       "id": "m_kalts",
-      "type": "marker",
+      "type": "label",
       "x": -1160,
       "y": 1040,
       "title": "标记名 kalts",
       "tag": "kalts",
-      "next": "l_kalts"
+      "next": "l_kalts",
+      "text": "kalts"
     },
     {
       "id": "l_kalts",
@@ -337,12 +339,13 @@
     },
     {
       "id": "m_angel",
-      "type": "marker",
+      "type": "label",
       "x": -1160,
       "y": 1180,
       "title": "标记名 angel",
       "tag": "angel",
-      "next": "l_angel"
+      "next": "l_angel",
+      "text": "angel"
     },
     {
       "id": "l_angel",
@@ -354,12 +357,13 @@
     },
     {
       "id": "m_chen",
-      "type": "marker",
+      "type": "label",
       "x": -1160,
       "y": 1320,
       "title": "标记名 chen",
       "tag": "chen",
-      "next": "l_chen"
+      "next": "l_chen",
+      "text": "chen"
     },
     {
       "id": "l_chen",
@@ -380,14 +384,15 @@
     },
     {
       "id": "w_tired",
-      "type": "weight",
+      "type": "variable",
       "x": -920,
       "y": 880,
       "title": "加权 · 疲惫",
-      "target": "疲惫",
-      "amount": "2",
-      "cond": "撒谎次数 > 0",
-      "next": "s5"
+      "next": "s5",
+      "add": [
+        "w_tired_v"
+      ],
+      "name": "疲惫"
     },
     {
       "id": "wb_guess",
@@ -439,6 +444,14 @@
       "src": "res://scripts/minigame.gd",
       "entry": "start",
       "next": "e3"
+    },
+    {
+      "id": "w_tired_v",
+      "type": "value",
+      "x": -1180,
+      "y": 880,
+      "title": "值 2",
+      "text": "2"
     }
   ],
   "groups": [
@@ -491,7 +504,8 @@
         "w_tired",
         "wb_guess",
         "wb_soft",
-        "s_minigame"
+        "s_minigame",
+        "w_tired_v"
       ],
       "color": "#19d1ff"
     }

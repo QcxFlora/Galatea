@@ -218,13 +218,16 @@ pub enum NodeKind {
     },
     /// 从子图返回
     Return,
-    /// 加权块：路过时给一个自定义变量加权（把「谁更偏向哪边」累计下来）
-    Weight {
-        target: String,
-        /// 加多少（表达式，可为负）
-        amount: String,
-        /// 可选条件：满足才加权
-        cond: String,
+    /// 值块：一个数值/表达式。两种用法：
+    ///   · 连到「变量块」的 add 端口 → 给变量加这个值
+    ///   · 连到「加权分支」的某个端口 → 这条路的权重
+    Value {
+        expr: String,
+    },
+    /// 变量块：一句「给这个变量加值」。`add` 端口连值块（可多个，累加）。
+    Variable {
+        name: String,
+        add: Vec<String>,
         next: Option<String>,
     },
     /// 加权分支：按权重随机走一条
@@ -234,15 +237,12 @@ pub enum NodeKind {
     },
     /// 结局
     End { ending: String, text: String },
-    /// 标记名：剧本内部引用的标识（不显示给玩家），例如 `amiya`
-    /// 通过 `label` 端口连到一个「显示名」方块
-    Marker {
-        tag: String,
-        next: Option<String>,
-    },
-    /// 显示名：真正显示的文字，例如「阿米娅」
-    /// 同一个标记名可以连到不同显示名（不同场景叫法不同）
+    /// 显示块：一个「名字」。
+    /// `tag` 是剧本内部引用的标识（amiya），`text` 是显示的文字（阿米娅）。
+    /// 它连到台词 = 说话人；连到立绘 = 角色名；连到背景 = 场景名——
+    /// **同一个块可以充当任何一种名字，看它连到谁**。
     Label {
+        tag: Option<String>,
         text: String,
         next: Option<String>,
     },
@@ -294,9 +294,9 @@ impl NodeKind {
             NodeKind::Character { .. } => "character",
             NodeKind::Portrait { .. } => "portrait",
             NodeKind::Background { .. } => "background",
-            NodeKind::Marker { .. } => "marker",
             NodeKind::Label { .. } => "label",
-            NodeKind::Weight { .. } => "weight",
+            NodeKind::Value { .. } => "value",
+            NodeKind::Variable { .. } => "variable",
             NodeKind::Weighted { .. } => "weighted",
         }
     }
@@ -315,9 +315,9 @@ impl NodeKind {
             NodeKind::Character { .. } => "#7aa2f7",
             NodeKind::Portrait { .. } => "#c3a6ff",
             NodeKind::Background { .. } => "#68d5ba",
-            NodeKind::Marker { .. } => "#ffd166",
             NodeKind::Label { .. } => "#ffffff",
-            NodeKind::Weight { .. } => "#8fbcbb",
+            NodeKind::Value { .. } => "#8fbcbb",
+            NodeKind::Variable { .. } => "#a3be8c",
             NodeKind::Weighted { .. } => "#d08770",
         }
     }
@@ -386,7 +386,11 @@ impl Node {
                     v.push(("next".to_string(), n.clone()));
                 }
             }
-            NodeKind::Marker { next, .. } => {
+            NodeKind::Value { .. } => {}
+            NodeKind::Variable { add, next, .. } => {
+                for a in add {
+                    v.push(("add".to_string(), a.clone()));
+                }
                 if let Some(n) = next {
                     v.push(("next".to_string(), n.clone()));
                 }
@@ -402,11 +406,6 @@ impl Node {
                 }
                 if let Some(n) = no {
                     v.push(("no".to_string(), n.clone()));
-                }
-            }
-            NodeKind::Weight { next, .. } => {
-                if let Some(n) = next {
-                    v.push(("next".to_string(), n.clone()));
                 }
             }
             NodeKind::Weighted { branches, .. } => {
@@ -473,7 +472,15 @@ impl Node {
             (NodeKind::Portrait { next, .. }, "next") => *next = target,
             (NodeKind::Background { next, .. }, "next") => *next = target,
             (NodeKind::Label { next, .. }, "next") => *next = target,
-            (NodeKind::Marker { next, .. }, "next") => *next = target,
+            (NodeKind::Variable { add, .. }, "add") => match target {
+                Some(t) => {
+                    if !add.contains(&t) {
+                        add.push(t);
+                    }
+                }
+                None => add.clear(),
+            },
+            (NodeKind::Variable { next, .. }, "next") => *next = target,
             (NodeKind::Set { next, .. }, "next") => *next = target,
             (NodeKind::Script { next, .. }, "next") => *next = target,
             (NodeKind::Branch { yes, .. }, "yes") => *yes = target,
@@ -481,7 +488,6 @@ impl Node {
             (NodeKind::Jump { to }, "to") => *to = target,
             (NodeKind::Call { to, .. }, "to") => *to = target,
             (NodeKind::Call { next, .. }, "back") => *next = target,
-            (NodeKind::Weight { next, .. }, "next") => *next = target,
             (NodeKind::Weighted { branches, .. }, p) if p.starts_with('w') => {
                 if let Ok(i) = p[1..].parse::<usize>() {
                     if let Some(b) = branches.get_mut(i) {
@@ -661,19 +667,6 @@ impl Story {
                     );
                 }
             }
-            NodeKind::Weight {
-                target,
-                amount,
-                cond,
-                next,
-            } => {
-                o.set("target", Json::s(target.clone()));
-                o.set("amount", Json::s(amount.clone()));
-                if !cond.is_empty() {
-                    o.set("cond", Json::s(cond.clone()));
-                }
-                opt(next, "next", &mut o);
-            }
             NodeKind::Weighted { prompt, branches } => {
                 o.set("prompt", Json::s(prompt.clone()));
                 let mut arr = Json::arr();
@@ -729,12 +722,24 @@ impl Story {
                     o.set("text", Json::s(text.clone()));
                 }
             }
-            NodeKind::Marker { tag, next } => {
-                o.set("tag", Json::s(tag.clone()));
+            NodeKind::Label { tag, text, next } => {
+                if let Some(t) = tag {
+                    o.set("tag", Json::s(t.clone()));
+                }
+                o.set("text", Json::s(text.clone()));
                 opt(next, "next", &mut o);
             }
-            NodeKind::Label { text, next } => {
-                o.set("text", Json::s(text.clone()));
+            NodeKind::Value { expr } => {
+                o.set("expr", Json::s(expr.clone()));
+            }
+            NodeKind::Variable { name, add, next } => {
+                o.set("name", Json::s(name.clone()));
+                if !add.is_empty() {
+                    o.set(
+                        "add",
+                        Json::Arr(add.iter().map(|x| Json::s(x.clone())).collect()),
+                    );
+                }
                 opt(next, "next", &mut o);
             }
             NodeKind::Character {
@@ -952,12 +957,6 @@ impl Story {
                     ending: nj.s_or("ending", "end"),
                     text: nj.s_or("text", ""),
                 },
-                "weight" => NodeKind::Weight {
-                    target: nj.s_or("target", "权重"),
-                    amount: nj.s_or("amount", "1"),
-                    cond: nj.s_or("cond", ""),
-                    next: nj.opt_str("next").filter(|s| !s.is_empty()),
-                },
                 "weighted" => {
                     let mut branches = Vec::new();
                     for bj in nj.arr_or_empty("branches") {
@@ -972,12 +971,35 @@ impl Story {
                         branches,
                     }
                 }
-                "marker" => NodeKind::Marker {
-                    tag: nj.s_or("tag", &id),
+                // 旧数据里的 marker 自动升级成 label（tag 保留，text 先用 tag）
+                "marker" => {
+                    let tag = nj.s_or("tag", &id);
+                    NodeKind::Label {
+                        tag: Some(tag.clone()),
+                        text: tag,
+                        next: nj.opt_str("next").filter(|s| !s.is_empty()),
+                    }
+                }
+                "label" => NodeKind::Label {
+                    tag: nj.opt_str("tag").filter(|s| !s.is_empty()),
+                    text: nj.s_or("text", ""),
                     next: nj.opt_str("next").filter(|s| !s.is_empty()),
                 },
-                "label" => NodeKind::Label {
-                    text: nj.s_or("text", ""),
+                "value" => NodeKind::Value {
+                    expr: nj.s_or("expr", "1"),
+                },
+                "variable" => NodeKind::Variable {
+                    name: nj.s_or("name", ""),
+                    add: {
+                        match nj.get("add") {
+                            Some(Json::Str(x)) if !x.is_empty() => vec![x.clone()],
+                            Some(Json::Arr(a)) => a
+                                .iter()
+                                .filter_map(|v| v.as_str().map(|x| x.to_string()))
+                                .collect(),
+                            _ => Vec::new(),
+                        }
+                    },
                     next: nj.opt_str("next").filter(|s| !s.is_empty()),
                 },
                 "character" => NodeKind::Character {

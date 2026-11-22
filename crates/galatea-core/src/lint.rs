@@ -184,42 +184,66 @@ pub fn lint(story: &Story) -> Vec<Issue> {
             NodeKind::End { .. } => {
                 has_end_reachable_graph.insert(n.id.clone());
             }
-            NodeKind::Weight {
-                target,
-                amount,
-                cond,
-                next,
-            } => {
-                if target.trim().is_empty() {
+            NodeKind::Variable { name, add, next } => {
+                if name.trim().is_empty() {
                     out.push(Issue {
                         level: Level::Warning,
                         node: Some(n.id.clone()),
-                        kind: "weight-target",
-                        msg: "加权块没有指定变量".into(),
+                        kind: "var-name",
+                        msg: "变量块没有写变量名".into(),
                     });
                 }
-                if amount.trim().is_empty() {
+                if add.is_empty() {
                     out.push(Issue {
                         level: Level::Warning,
                         node: Some(n.id.clone()),
-                        kind: "weight-amount",
-                        msg: "加权块没有写权重表达式".into(),
+                        kind: "var-add",
+                        msg: format!("变量 `{}` 没有连值块（不会加到任何值）", name),
                     });
                 }
-                if !cond.trim().is_empty() && expr::parse(cond).is_err() {
-                    out.push(Issue {
-                        level: Level::Error,
-                        node: Some(n.id.clone()),
-                        kind: "bad-expr",
-                        msg: format!("加权条件写错了：{}", cond),
-                    });
+                for vid in add {
+                    match story.node(vid) {
+                        Some(vn) => {
+                            if !matches!(vn.kind, NodeKind::Value { .. }) {
+                                out.push(Issue {
+                                    level: Level::Warning,
+                                    node: Some(n.id.clone()),
+                                    kind: "var-add-target",
+                                    msg: "变量块的 add 端口应该连「值块」".into(),
+                                });
+                            }
+                        }
+                        None => out.push(Issue {
+                            level: Level::Error,
+                            node: Some(n.id.clone()),
+                            kind: "dangling",
+                            msg: format!("add 端口连向了不存在的方块 `{}`", vid),
+                        }),
+                    }
                 }
                 if next.is_none() {
                     out.push(Issue {
                         level: Level::Warning,
                         node: Some(n.id.clone()),
                         kind: "dead-end",
-                        msg: "加权块后面没有连线".into(),
+                        msg: "变量块后面没有连线".into(),
+                    });
+                }
+            }
+            NodeKind::Value { expr } => {
+                if expr.trim().is_empty() {
+                    out.push(Issue {
+                        level: Level::Warning,
+                        node: Some(n.id.clone()),
+                        kind: "value-empty",
+                        msg: "值块是空的".into(),
+                    });
+                } else if expr::parse(expr).is_err() {
+                    out.push(Issue {
+                        level: Level::Error,
+                        node: Some(n.id.clone()),
+                        kind: "bad-expr",
+                        msg: format!("值块表达式写错了：{}", expr),
                     });
                 }
             }
@@ -269,33 +293,26 @@ pub fn lint(story: &Story) -> Vec<Issue> {
                     });
                 }
             }
-            NodeKind::Marker { tag, next } => {
-                if tag.trim().is_empty() {
+            NodeKind::Label { tag, text, next } => {
+                if text.trim().is_empty() {
                     out.push(Issue {
                         level: Level::Warning,
                         node: Some(n.id.clone()),
-                        kind: "marker-tag",
-                        msg: "标记名方块缺 tag".into(),
+                        kind: "label-text",
+                        msg: "显示块是空的".into(),
                     });
                 }
-                match next.as_deref().and_then(|id| story.node(id)) {
-                    Some(ln) => {
-                        if !matches!(ln.kind, NodeKind::Label { .. }) {
-                            out.push(Issue {
-                                level: Level::Warning,
-                                node: Some(n.id.clone()),
-                                kind: "marker-target",
-                                msg: "标记名的连线应该指向一个「显示名」方块".into(),
-                            });
-                        }
+                if let Some(t) = tag {
+                    if t.trim().is_empty() {
+                        out.push(Issue {
+                            level: Level::Warning,
+                            node: Some(n.id.clone()),
+                            kind: "label-tag",
+                            msg: "显示块的 tag 是空的".into(),
+                        });
                     }
-                    None => out.push(Issue {
-                        level: Level::Warning,
-                        node: Some(n.id.clone()),
-                        kind: "marker-unlinked",
-                        msg: format!("标记名 `{}` 还没连到显示名", tag),
-                    }),
                 }
+                let _ = next;
             }
             NodeKind::Label { text, .. } => {
                 if text.trim().is_empty() {
@@ -572,7 +589,7 @@ pub fn is_asset_kind(kind: &NodeKind) -> bool {
         NodeKind::Character { .. }
             | NodeKind::Portrait { .. }
             | NodeKind::Background { .. }
-            | NodeKind::Marker { .. }
             | NodeKind::Label { .. }
+            | NodeKind::Value { .. }
     )
 }
