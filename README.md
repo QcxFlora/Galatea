@@ -38,7 +38,8 @@ Rust 核心 + Flutter 编辑器，把整部视觉小说当作一张可拖拽、�
 | ✨ 2026-11-22 | 0.1.0 | 初始版本：`galatea-core` 引擎核心（JSON / 表达式 / 剧情图 / VM / lint / CLI，19 个单元测试全绿）；示例剧本《雨声与自动门》上线；Flutter 端模型层与 VM 的 Dart 实现 |
 | 🌐 2026-11-22 | 0.1.0 | **Web 先行版**上线（`web/index.html` 单文件，含 lilt 弹簧动画 + 扁平 3D 首界面 + 思维导图编辑器 + 播放器，37 项逻辑测试通过，手机浏览器可玩） |
 | ⚙️ 2026-11-22 | 0.1.0 | **自定义 Rust 脚本宿主**上线：Rust 安全子集解释器 + spring/ease/set/emit/get 内置函数 + `script` 节点类型 + `galatea script` 调参与曲线采样（7 个测试） |
-| 🧭 计划 | — | Rust → wasm 脚本编译、`galatea pack` 打包器、Flutter 桌面端 |
+| 🎞️ 2026-11-22 | 0.1.0 | Flutter 端接入 lilt 弹簧动画（`spring.dart`：五预设 + SpringBuilder）；CI 三端全绿（Rust 26 测试 / Web 37 测试 / Flutter analyze+test） |
+| 🧭 计划 | — | Rust → wasm 脚本编译、`galatea pack` 打包器、Flutter 桌面端窗口与立绘资源管线 |
 
 ---
 
@@ -223,7 +224,15 @@ Galatea 的一切动效采用 [chhongzh/lilt](https://github.com/chhongzh/lilt) 
 | `Bouncy` | 0.25 | 0.45 | 勾选、失败抖动（`Kick`/`Bump`） |
 | `Interactive` | 0.14 | 1.00 | 跟手元素，不过冲 |
 
-落地形态：画布上节点卡片被拖动时邻居连线像弹簧一样牵动；选中卡片有 Bouncy 呼吸；编辑器切播放器是 Smooth 飞入；选项按钮按下 Interactive 收缩、松手 Bouncy 回弹。越界拖拽使用 `RubberBand`（0.55 系数，与 UIScrollView 相同）。
+落地形态：
+
+| 端 | 实现 | 用在哪 |
+|----|------|--------|
+| Web | `web/index.html` 内 `Spring` / `SCHEDULER` / `PRESETS` | 首界面标题 Bouncy 落下、视差 Interactive 跟手、页面 Smooth 切换、选项 stagger、面板弹入 |
+| Flutter | [`app/lib/engine/spring.dart`](app/lib/engine/spring.dart) 的 `SpringValue` / `SpringPreset` / `SpringBuilder` | 标题弹入、播放器对话框滑入、选项依次弹入（55ms stagger） |
+| Rust | `crates/galatea-core/src/script.rs` 的 `spring_sample()` | 自定义脚本里的 `spring(p, response, damping)`，导数曲线可直接采样 |
+
+三端参数完全一致（`Smooth 0.39/0.85`、`Snappy 0.31/0.80`、`Bouncy 0.25/0.45`、`Interactive 0.14/1.0`），所以 Web 上试出来的手感，打包到 Flutter 端是一样的。越界拖拽使用 `RubberBand`（0.55 系数，与 UIScrollView 相同）。
 
 ---
 
