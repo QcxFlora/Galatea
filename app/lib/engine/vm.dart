@@ -304,6 +304,12 @@ class Vm {
         case NodeType.ret:
           pc = stack.isEmpty ? null : stack.removeLast();
           break;
+        case NodeType.script:
+          // Dart 侧不执行 Rust 脚本（由 FFI 的 Rust VM 负责）；
+          // 编辑器里跳过并留一条记录，保证图还能玩通。
+          log.add('（⚙ 脚本节点 ${node.entry}()：编辑器内试玩跳过自定义脚本）');
+          pc = node.next;
+          break;
         case NodeType.end:
           pc = null;
           endedEnding = node.ending;

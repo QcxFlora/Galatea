@@ -334,7 +334,9 @@ const NODE_TYPE = {
   call:  {label:'子图', icon:'📦', color:'#00b8d9'},
   return:{label:'返回', icon:'↩️', color:'#8892a8'},
   end:   {label:'结局', icon:'🎬', color:'#ff5c74'},
+  script:{label:'脚本', icon:'⚙️', color:'#ff7a45'},
 };
+const NT = t => NODE_TYPE[t] || {label:String(t), icon:'?', color:'#8892a8'};
 function nodePorts(n){
   switch(n.type){
     case 'say': case 'set': return ['next'];
@@ -342,6 +344,7 @@ function nodePorts(n){
     case 'choice': return n.options.map((_,i)=>'opt'+i);
     case 'jump': return ['to'];
     case 'call': return ['to','back'];
+    case 'script': return ['next'];
     default: return [];
   }
 }
@@ -368,6 +371,7 @@ function nodeTitle(n){
     case 'set': return '变量'; case 'jump': return '跳转';
     case 'call': return '子图调用'; case 'return': return '返回';
     case 'end': return '结局 · '+(n.ending||'end');
+    case 'script': return n.title || '脚本';
   }
 }
 function nodeSummary(n){
@@ -380,6 +384,7 @@ function nodeSummary(n){
     case 'call': return n.to?('进入 '+n.to):'（没连）';
     case 'return': return '回到调用处';
     case 'end': return n.text||n.ending||'end';
+    case 'script': return (n.src||'内联脚本')+' → '+(n.entry||'main')+'()';
   }
 }
 function fxStr(e){ return `${e.target} ${OPSYM[e.op]||'='} ${e.expr}`; }
@@ -627,6 +632,11 @@ function vmStep(vm){
         break;
       }
       case 'set': vmApply(vm, n.effects||[]); vm.pc=n.next||null; break;
+      case 'script': {
+        vm.log.push('（⚙ 脚本节点 '+(n.entry||'main')+'()：Web 先行版不执行自定义 Rust 脚本，已跳过）');
+        vm.pc=n.next||null;
+        break;
+      }
       case 'jump': vm.pc=n.to||null; break;
       case 'call':
         if(vm.stack.length>=64) return {k:'halt', reason:'子图调用嵌套太深（是不是递归了？）'};
@@ -701,7 +711,7 @@ function lintStory(s){
   if(s.meta.start&&nodeById(s.meta.start)){
     const seen=reachable(s);
     for(const n of s.nodes) if(!seen.has(n.id))
-      out.push({lv:'warn',node:n.id,msg:'从入口走不到这个节点（'+NODE_TYPE[n.type].label+'）'});
+      out.push({lv:'warn',node:n.id,msg:'从入口走不到这个节点（'+NT(n.type).label+'）'});
     let anyEnd=false; for(const e of ends) if(seen.has(e)) anyEnd=true;
     if(!anyEnd) out.push({lv:'err',node:null,msg:'从入口出发走不到任何结局节点'});
   }
@@ -949,7 +959,7 @@ EDITOR=(()=>{
       const scale = isSel? pulse : 1;
       ctx.save();
       ctx.translate(sx+w/2, sy+h/2); ctx.scale(scale,scale); ctx.translate(-(w/2),-(h/2));
-      const col=NODE_TYPE[n.type].color;
+      const col=NT(n.type).color;
       // 阴影
       ctx.fillStyle='rgba(0,0,0,.4)';
       rr(ctx,3,5,w,h,12*cam.z); ctx.fill();
@@ -965,7 +975,7 @@ EDITOR=(()=>{
       if(cam.z>.34){
         ctx.fillStyle=col; ctx.textBaseline='middle';
         ctx.font=`${Math.round(12*cam.z)}px sans-serif`;
-        ctx.fillText((NODE_TYPE[n.type].icon||'')+nodeTitle(n), 9*cam.z, 15.5*cam.z);
+        ctx.fillText((NT(n.type).icon||'')+nodeTitle(n), 9*cam.z, 15.5*cam.z);
         // 星标
         ctx.fillStyle = isStart? '#ffb02e' : '#5a6478';
         ctx.font=`${Math.round(14*cam.z)}px sans-serif`;
@@ -1180,7 +1190,7 @@ EDITOR=(()=>{
     }
     selected=id; selPulse.bump(6); showInspector(n);
     STORY_dirty(); SCHEDULER.wake();
-    toast('已添加 '+NODE_TYPE[type].label+'（'+(base?'并接上一条线':'设为开头一部分')+'）');
+    toast('已添加 '+NT(type).label+'（'+(base?'并接上一条线':'设为开头一部分')+'）');
   }
 
   /* ── 属性面板 ── */
@@ -1190,8 +1200,8 @@ EDITOR=(()=>{
     // 面板弹簧滑入
     if(!insp._sp){ insp._sp=new Spring(60, PRESET.smooth); REDRAW.push(()=>{ insp.style.transform='translateY('+insp._sp.v+'px)'; }); }
     insp._sp.jump(60); insp._sp.set(0); SCHEDULER.wake();
-    $('#insType').textContent=NODE_TYPE[n.type].icon+' '+NODE_TYPE[n.type].label;
-    $('#insType').style.color=NODE_TYPE[n.type].color;
+    $('#insType').textContent=NT(n.type).icon+' '+NT(n.type).label;
+    $('#insType').style.color=NT(n.type).color;
     $('#insId').textContent=n.id;
     insBody.innerHTML=inspHTML(n);
     bindInsp(n);
@@ -1251,6 +1261,13 @@ EDITOR=(()=>{
         h+=fld('结局代号','f_end',n.ending,{hint:'good / bad / true ……'});
         h+=fld('结局文字','f_endt',n.text,{area:true});
         break;
+      case 'script':
+        h+=fld('脚本路径（相对仓库根）','f_src',n.src||'',{hint:'scripts/intro.rs'});
+        h+=fld('入口函数','f_entry',n.entry||'main',{hint:'opening'});
+        h+='<div style="color:var(--dim);font-size:11.5px;line-height:1.7;padding:6px 0">'
+          +'脚本用 Rust 安全子集写（fn/let/if/while/return），内置 spring / ease / set / emit / get。'
+          +'<br>Web 先行版只显示节点、不执行脚本；执行请用 <code>galatea play</code> 或桌面版。</div>';
+        break;
     }
     // 连线状态
     const ps=nodePorts(n);
@@ -1276,6 +1293,8 @@ EDITOR=(()=>{
     on('f_cond','input',e=>{ n.cond=e.target.value; STORY_dirty(); });
     on('f_prompt','input',e=>{ n.prompt=e.target.value; STORY_dirty(); });
     on('f_end','input',e=>{ n.ending=e.target.value; STORY_dirty(); });
+    on('f_src','input',e=>{ n.src=e.target.value.trim()||null; STORY_dirty(); });
+    on('f_entry','input',e=>{ n.entry=e.target.value.trim()||'main'; STORY_dirty(); });
     on('f_endt','input',e=>{ n.text=e.target.value; STORY_dirty(); });
     insBody.querySelectorAll('[id^="opt"]').forEach(el=>{
       el.addEventListener('input',()=>{

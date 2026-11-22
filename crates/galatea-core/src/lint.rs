@@ -100,6 +100,16 @@ pub fn lint(story: &Story) -> Vec<Issue> {
                     });
                 }
             }
+            NodeKind::Script { next, .. } => {
+                if next.is_none() {
+                    out.push(Issue {
+                        level: Level::Warning,
+                        node: Some(n.id.clone()),
+                        kind: "dead-end",
+                        msg: "脚本执行完之后没有连线，剧情会在这里断掉".into(),
+                    });
+                }
+            }
             NodeKind::Branch { yes, no, cond } => {
                 if yes.is_none() || no.is_none() {
                     out.push(Issue {

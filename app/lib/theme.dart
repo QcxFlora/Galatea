@@ -32,6 +32,8 @@ class GColors {
         return const Color(0xFF8892A8);
       case 'end':
         return const Color(0xFFFF5C74);
+      case 'script':
+        return const Color(0xFFFF7A45);
       default:
         return const Color(0xFF8892A8);
     }

@@ -11,6 +11,7 @@
 use galatea_core::graph::{Character, Node, Story};
 use galatea_core::json::Json;
 use galatea_core::lint::{self, Level};
+use galatea_core::script::{Script, Value as ScriptValue};
 use galatea_core::vm::{Event, Vm};
 use std::io::{self, BufRead, Write};
 
@@ -29,6 +30,7 @@ fn main() {
         "fmt" | "format" => cmd_fmt(&file),
         "new" | "init" => cmd_new(&file, rest.first().cloned().unwrap_or_else(|| "未命名".into())),
         "stat" | "stats" => cmd_stat(&file),
+        "script" | "sc" => cmd_script(&file, &rest),
         "help" | "-h" | "--help" => {
             usage();
             Ok(())
@@ -53,6 +55,8 @@ fn usage() {
     println!("  galatea play <文件>          终端试玩（回车继续 / 数字选择 / u 撤销 / q 退出）");
     println!("  galatea fmt  <文件>          规范化格式");
     println!("  galatea stat <文件>          统计");
+    println!("  galatea script <脚本.rs> [函数] [参数…]   跑自定义脚本");
+    println!("         --sample <起> <止> <步数>            采样一条动画曲线");
 }
 
 fn load(file: &str) -> Result<Story, String> {
@@ -231,6 +235,7 @@ fn cmd_stat(file: &str) -> Result<(), String> {
                 let _ = options.len();
             }
             Event::Say { .. } => {}
+            Event::Script { .. } => {}
             Event::Ending { .. } | Event::Halt { .. } => break,
         }
     }
@@ -264,6 +269,7 @@ fn cmd_play(file: &str) -> Result<(), String> {
                 text,
                 ..
             } => {
+                let text = interpolate(&vm, &text);
                 if speaker_name.is_empty() {
                     println!("  {}", text);
                 } else {
@@ -338,6 +344,18 @@ fn cmd_play(file: &str) -> Result<(), String> {
                 println!("（本次路过 {}/{} 个节点）", seen, total);
                 break;
             }
+            Event::Script { entry, ret, emits, .. } => {
+                println!("  ⚙ 脚本 {} → 返回 {:?}", entry, ret);
+                for (k, v) in emits {
+                    println!("     ↳ emit {} = {}", k, v.to_string());
+                }
+                print!("> ");
+                io::stdout().flush().ok();
+                match lines.next() {
+                    Some(Ok(l)) if l.trim() == "q" => break,
+                    _ => println!(),
+                }
+            }
             Event::Halt { reason } => {
                 println!("\n（停下：{}）", reason);
                 break;
@@ -345,4 +363,91 @@ fn cmd_play(file: &str) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn cmd_script(file: &str, args: &[String]) -> Result<(), String> {
+    let path = std::path::Path::new(file);
+    let script = Script::from_file(path)?;
+    let get = |_: &str| ScriptValue::Null;
+
+    if args.is_empty() {
+        println!("{}：{} 个函数", script.name, script.program.functions.len());
+        for f in &script.program.functions {
+            println!("  fn {}({})", f.name, f.params.join(", "));
+        }
+        println!();
+        println!("用法：galatea script <文件> <函数> [参数…]");
+        println!("      galatea script <文件> <函数> --sample 0 1 20");
+        return Ok(());
+    }
+
+    let fname = &args[0];
+
+    if args.len() >= 2 && args[1] == "--sample" {
+        let from: f64 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+        let to: f64 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1.0);
+        let steps: usize = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(16);
+        println!("采样 {}(t)：{} → {}，{} 步", fname, from, to, steps);
+        for i in 0..=steps {
+            let t = from + (to - from) * (i as f64 / steps.max(1) as f64);
+            let r = script.call(fname, vec![ScriptValue::Num(t)], &get)?;
+            let v = r.ret.unwrap_or(ScriptValue::Num(0.0)).num();
+            let width = ((v.abs() * 1.6) as usize).min(40);
+            let pad = 40usize.saturating_sub(width);
+            println!("  t={:6.3} v={:8.4} {}{}", t, v, " ".repeat(pad), "#".repeat(width));
+        }
+        return Ok(());
+    }
+
+    let mut call_args = Vec::new();
+    for a in &args[1..] {
+        if let Ok(n) = a.parse::<f64>() {
+            call_args.push(ScriptValue::Num(n));
+        } else if a == "true" {
+            call_args.push(ScriptValue::Bool(true));
+        } else if a == "false" {
+            call_args.push(ScriptValue::Bool(false));
+        } else {
+            call_args.push(ScriptValue::Str(a.clone()));
+        }
+    }
+
+    let r = script.call(fname, call_args, &get)?;
+    match &r.ret {
+        Some(ScriptValue::Num(n)) => println!("返回：{}", n),
+        Some(ScriptValue::Str(s)) => println!("返回：\"{}\"", s),
+        Some(v) => println!("返回：{:?}", v),
+        None => println!("返回：空"),
+    }
+    for (k, v) in &r.vars {
+        println!("set {} = {:?} → {:?}", k, v, v.to_json().to_string());
+    }
+    for (k, v) in &r.emits {
+        println!("emit {} = {:?}", k, v);
+    }
+    println!("（执行 {} 步）", r.steps);
+    Ok(())
+}
+
+/// 把台词里的 `{变量名}` 替换成当前值
+fn interpolate(vm: &Vm, text: &str) -> String {
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(start) = rest.find('{') {
+        out.push_str(&rest[..start]);
+        let tail = &rest[start..];
+        match tail.find('}') {
+            Some(end) => {
+                let name = &tail[1..end];
+                out.push_str(&vm.var(name.trim()).as_display());
+                rest = &tail[end + 1..];
+            }
+            None => {
+                out.push_str(tail);
+                rest = "";
+            }
+        }
+    }
+    out.push_str(rest);
+    out
 }

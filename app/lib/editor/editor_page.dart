@@ -133,6 +133,10 @@ class _EditorPageState extends State<EditorPage> {
         node.ending = 'end_${story.nodes.where((n) => n.type == NodeType.end).length + 1}';
         node.endText = '结局文字';
         break;
+      case NodeType.script:
+        node.src = 'scripts/intro.rs';
+        node.entry = 'opening';
+        break;
       default:
         break;
     }
@@ -368,6 +372,7 @@ class _EditorPageState extends State<EditorPage> {
       NodeType.call,
       NodeType.ret,
       NodeType.end,
+      NodeType.script,
     ];
     return Container(
       height: 62,

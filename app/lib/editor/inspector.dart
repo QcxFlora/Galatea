@@ -187,6 +187,22 @@ class Inspector extends StatelessWidget {
           Text('执行到这里会回到调用它的「子图」节点。',
               style: TextStyle(fontSize: 12, color: GColors.dim)),
         ];
+      case NodeType.script:
+        return [
+          _text('脚本路径（相对项目根）', node.src ?? '', (v) {
+            node.src = v.isEmpty ? null : v;
+            onChanged();
+          }, hint: 'scripts/intro.rs'),
+          const SizedBox(height: 10),
+          _text('入口函数', node.entry, (v) {
+            node.entry = v.isEmpty ? 'main' : v;
+            onChanged();
+          }, hint: 'opening'),
+          const SizedBox(height: 10),
+          const Text(
+              '脚本用 Rust 安全子集（fn/let/if/while/return），内置 spring / ease / set / emit / get。',
+              style: TextStyle(fontSize: 11.5, color: GColors.dim, height: 1.6)),
+        ];
       case NodeType.end:
         return [
           _text('结局代号', node.ending, (v) {
@@ -464,6 +480,7 @@ List<String> nodePortsOf(StoryNode n) {
   switch (n.type) {
     case NodeType.say:
     case NodeType.set:
+    case NodeType.script:
       return const ['next'];
     case NodeType.branch:
       return const ['yes', 'no'];

@@ -8,7 +8,7 @@ import 'dart:convert';
 
 // ------------------------------------------------------------------ 节点类型
 
-enum NodeType { say, choice, branch, set, jump, call, ret, end }
+enum NodeType { say, choice, branch, set, jump, call, ret, end, script }
 
 String nodeTypeId(NodeType t) {
   switch (t) {
@@ -28,6 +28,8 @@ String nodeTypeId(NodeType t) {
       return 'return';
     case NodeType.end:
       return 'end';
+    case NodeType.script:
+      return 'script';
   }
 }
 
@@ -47,6 +49,8 @@ NodeType nodeTypeFrom(String? s) {
       return NodeType.ret;
     case 'end':
       return NodeType.end;
+    case 'script':
+      return NodeType.script;
     default:
       return NodeType.say;
   }
@@ -70,6 +74,8 @@ String nodeTypeLabel(NodeType t) {
       return '返回';
     case NodeType.end:
       return '结局';
+    case NodeType.script:
+      return '脚本';
   }
 }
 
@@ -91,6 +97,8 @@ String nodeTypeIcon(NodeType t) {
       return '↩️';
     case NodeType.end:
       return '🎬';
+    case NodeType.script:
+      return '⚙️';
   }
 }
 
@@ -267,6 +275,11 @@ class StoryNode {
   String ending;
   String endText;
 
+  // 自定义 Rust 脚本（src 路径 或 code 内联，二选一）
+  String? src;
+  String? code;
+  String entry;
+
   StoryNode({
     required this.id,
     required this.type,
@@ -287,6 +300,9 @@ class StoryNode {
     List<Effect>? effects,
     this.ending = '',
     this.endText = '',
+    this.src,
+    this.code,
+    this.entry = 'main',
   })  : options = options ?? <Choice>[],
         effects = effects ?? <Effect>[];
 
@@ -316,6 +332,9 @@ class StoryNode {
           : <Effect>[],
       ending: asString(m['ending'], fallback: 'end'),
       endText: asString(m['text']),
+      src: asOptString(m['src']),
+      code: asOptString(m['code']),
+      entry: asString(m['entry'], fallback: 'main'),
     );
   }
 
@@ -361,6 +380,12 @@ class StoryNode {
         m['ending'] = ending.isEmpty ? 'end' : ending;
         if (endText.isNotEmpty) m['text'] = endText;
         break;
+      case NodeType.script:
+        if (src != null && src!.isNotEmpty) m['src'] = src;
+        if (code != null && code!.isNotEmpty) m['code'] = code;
+        m['entry'] = entry.isEmpty ? 'main' : entry;
+        if (next != null && next!.isNotEmpty) m['next'] = next;
+        break;
     }
     return m;
   }
@@ -385,6 +410,9 @@ class StoryNode {
         effects: effects.map((e) => e.copy()).toList(),
         ending: ending,
         endText: endText,
+        src: src,
+        code: code,
+        entry: entry,
       );
 
   /// 所有出口：(端口名, 目标节点 id)
@@ -399,6 +427,7 @@ class StoryNode {
     switch (type) {
       case NodeType.say:
       case NodeType.set:
+      case NodeType.script:
         add('next', next);
         break;
       case NodeType.branch:
@@ -491,6 +520,8 @@ class StoryNode {
         return '回到调用处';
       case NodeType.end:
         return endText.isEmpty ? ending : endText;
+      case NodeType.script:
+        return '${src ?? '内联脚本'} → ${entry}()';
     }
   }
 
@@ -513,6 +544,8 @@ class StoryNode {
         return '返回';
       case NodeType.end:
         return '结局 · $ending';
+      case NodeType.script:
+        return '脚本';
     }
   }
 }

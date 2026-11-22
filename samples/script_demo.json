@@ -1,0 +1,72 @@
+{
+  "format": "galatea.graph/1",
+  "meta": {
+    "title": "脚本演示",
+    "author": "Galatea 示例",
+    "desc": "演示在剧情图里嵌自定义 Rust 脚本：跑 run 节点自搓演出，再把结果写回剧情变量。",
+    "version": "0.1.0",
+    "start": "n_start"
+  },
+  "characters": {
+    "hero": { "name": "我", "color": "#9ecbff" },
+    "xiayu": { "name": "夏雨", "color": "#7aa2f7" }
+  },
+  "vars": {
+    "aff": 2,
+    "看过开场": false
+  },
+  "nodes": [
+    {
+      "id": "n_start",
+      "type": "say",
+      "x": 0,
+      "y": 0,
+      "text": "（这个剧本里有一个 script 节点，它会调用 scripts/intro.rs）",
+      "next": "n_script"
+    },
+    {
+      "id": "n_script",
+      "type": "script",
+      "x": 0,
+      "y": 180,
+      "title": "开场演出",
+      "src": "scripts/intro.rs",
+      "entry": "opening",
+      "next": "n_check"
+    },
+    {
+      "id": "n_check",
+      "type": "branch",
+      "x": 0,
+      "y": 360,
+      "cond": "看过开场",
+      "yes": "n_yes",
+      "no": "n_no"
+    },
+    {
+      "id": "n_yes",
+      "type": "say",
+      "x": -220,
+      "y": 520,
+      "speaker": "xiayu",
+      "text": "脚本把「看过开场」写进变量表了，所以能走到这一句。好感现在是 {aff}。",
+      "next": "n_end"
+    },
+    {
+      "id": "n_no",
+      "type": "say",
+      "x": 220,
+      "y": 520,
+      "text": "脚本没有生效（变量还是 false）。",
+      "next": "n_end"
+    },
+    {
+      "id": "n_end",
+      "type": "end",
+      "x": 0,
+      "y": 700,
+      "ending": "script_ok",
+      "text": "结局 · 脚本跑通了"
+    }
+  ]
+}

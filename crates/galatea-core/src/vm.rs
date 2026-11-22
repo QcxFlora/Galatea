@@ -6,7 +6,9 @@
 use crate::expr;
 use crate::graph::{Effect, NodeKind, Op, Story};
 use crate::json::Json;
+use crate::script::{Script, Value as ScriptValue};
 use std::collections::{BTreeMap, BTreeSet};
+use std::rc::Rc;
 
 /// 给 UI 展示的一个选项（已经过条件/一次性过滤）
 #[derive(Debug, Clone, PartialEq)]
@@ -43,6 +45,15 @@ pub enum Event {
     /// 跑不下去了（剧情结束 / 断线 / 死循环）
     Halt {
         reason: String,
+    },
+    /// 执行了一个自定义 Rust 脚本节点
+    Script {
+        node: String,
+        entry: String,
+        /// 脚本返回值
+        ret: Json,
+        /// 脚本里 emit 出来的演出指令
+        emits: BTreeMap<String, Json>,
     },
 }
 
@@ -89,6 +100,10 @@ pub struct Vm {
     snapshots: Vec<Snapshot>,
     /// 本次运行中自动执行的节点数（用于诊断）
     pub auto_steps: u32,
+    /// 已编译的自定义脚本缓存
+    scripts: BTreeMap<String, Rc<Script>>,
+    /// 脚本相对路径的基准目录（默认为当前工作目录）
+    pub script_base: std::path::PathBuf,
 }
 
 impl Vm {
@@ -111,6 +126,9 @@ impl Vm {
             ended: None,
             snapshots: Vec::new(),
             auto_steps: 0,
+            scripts: BTreeMap::new(),
+            script_base: std::env::current_dir()
+                .unwrap_or_else(|_| std::path::PathBuf::from(".")),
         }
     }
 
@@ -365,6 +383,71 @@ impl Vm {
                 }
                 NodeKind::Return => {
                     self.pc = self.stack.pop().flatten();
+                }
+                NodeKind::Script {
+                    code,
+                    src,
+                    entry,
+                    next,
+                } => {
+                    let key = match (&src, &code) {
+                        (Some(s), _) => format!("file:{}", s),
+                        (None, Some(c)) => {
+                            let head: String = c.chars().take(48).collect();
+                            format!("inline:{}:{}", c.len(), head)
+                        }
+                        (None, None) => {
+                            return Event::Halt {
+                                reason: format!("脚本节点 `{}` 既没有 src 也没有 code", pc),
+                            }
+                        }
+                    };
+                    if !self.scripts.contains_key(&key) {
+                        let compiled = match (&src, &code) {
+                            (Some(path), _) => {
+                                Script::from_file(&self.script_base.join(path))
+                            }
+                            (None, Some(c)) => Script::compile("<inline>", c),
+                            (None, None) => unreachable!(),
+                        };
+                        match compiled {
+                            Ok(s) => {
+                                self.scripts.insert(key.clone(), Rc::new(s));
+                            }
+                            Err(e) => {
+                                return Event::Halt {
+                                    reason: format!("节点 `{}` 的脚本编译失败：{}", pc, e),
+                                }
+                            }
+                        }
+                    }
+                    let script = self.scripts.get(&key).cloned().unwrap();
+                    let res = {
+                        let getter = |n: &str| ScriptValue::from_json(&self.var(n));
+                        script.call(&entry, Vec::new(), &getter)
+                    };
+                    match res {
+                        Ok(r) => {
+                            for (k, v) in &r.vars {
+                                self.set_var(k, v.to_json());
+                            }
+                            let emits: BTreeMap<String, Json> =
+                                r.emits.iter().map(|(k, v)| (k.clone(), v.to_json())).collect();
+                            let ret = r.ret.clone().map(|v| v.to_json()).unwrap_or(Json::Null);
+                            self.pc = next;
+                            return Event::Script {
+                                node: pc,
+                                entry,
+                                ret,
+                                emits,
+                            };
+                        }
+                        Err(e) => {
+                            return Event::Halt {
+                                reason: format!("脚本 `{}` 执行失败：{}", entry, e),
+                            }
+                        }
+                    }
                 }
                 NodeKind::End { ending, text } => {
                     self.pc = None;

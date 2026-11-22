@@ -18,6 +18,7 @@ List<String> nodePorts(StoryNode n) {
   switch (n.type) {
     case NodeType.say:
     case NodeType.set:
+    case NodeType.script:
       return const ['next'];
     case NodeType.branch:
       return const ['yes', 'no'];

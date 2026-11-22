@@ -18,6 +18,7 @@ pub mod expr;
 pub mod graph;
 pub mod json;
 pub mod lint;
+pub mod script;
 pub mod vm;
 
 pub use graph::{Character, Choice, Effect, Meta, Node, NodeKind, Op, Story};

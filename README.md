@@ -37,7 +37,8 @@ Rust 核心 + Flutter 编辑器，把整部视觉小说当作一张可拖拽、�
 |------|------|------|
 | ✨ 2026-11-22 | 0.1.0 | 初始版本：`galatea-core` 引擎核心（JSON / 表达式 / 剧情图 / VM / lint / CLI，19 个单元测试全绿）；示例剧本《雨声与自动门》上线；Flutter 端模型层与 VM 的 Dart 实现 |
 | 🌐 2026-11-22 | 0.1.0 | **Web 先行版**上线（`web/index.html` 单文件，含 lilt 弹簧动画 + 扁平 3D 首界面 + 思维导图编辑器 + 播放器，37 项逻辑测试通过，手机浏览器可玩） |
-| 🧭 计划 | — | 自定义 Rust 脚本宿主、`galatea pack` 打包器、Flutter 桌面端 |
+| ⚙️ 2026-11-22 | 0.1.0 | **自定义 Rust 脚本宿主**上线：Rust 安全子集解释器 + spring/ease/set/emit/get 内置函数 + `script` 节点类型 + `galatea script` 调参与曲线采样（7 个测试） |
+| 🧭 计划 | — | Rust → wasm 脚本编译、`galatea pack` 打包器、Flutter 桌面端 |
 
 ---
 
@@ -228,18 +229,89 @@ Galatea 的一切动效采用 [chhongzh/lilt](https://github.com/chhongzh/lilt) 
 
 ## 自定义 Rust 脚本
 
-剧本 JSON 里的节点效果不只内置算子。`script` 节点可以指向一段随包分发的 Rust 源码，由引擎内置的解释宿主执行，供你自搓动画曲线、首界面演出、小游戏：
+剧本图里可以嵌**你自己的 Rust 脚本**，用来搓动画曲线、首界面演出、小游戏逻辑，不必改引擎本体。
 
 ```json
 {
+  "id": "n_script",
   "type": "script",
+  "title": "开场演出",
   "src": "scripts/intro.rs",
-  "entry": "intro_screen",
-  "args": { "title": "雨声与自动门" }
+  "entry": "opening",
+  "next": "n_choice1"
 }
 ```
 
-宿主提供 `springs`（弹簧值）、`camera`（伪 3D 透视）、`tween`、`draw`（扁平几何图形）等沙箱 API。脚本与剧情 VM 共享变量表，因此「播完一段自搓动画再推进剧情」就是一行 `vm.set_pc(next)`。*（本节为设计规格，宿主 API 正在实现，详见 issue #1。）*
+### 脚本长什么样
+
+语法是 Rust 的安全子集（`fn` / `let` / `if` / `else` / `while` / `return`），由引擎内置解释器执行：零依赖、可交叉编译、没有 IO 与 unsafe，跑不出剧本之外。
+
+```rust
+// scripts/intro.rs —— 标题从下方弹入，返回 Y 偏移（像素）
+fn title_entry(t) {
+    let s = spring(t, 0.25, 0.45);      // 与 UI 同一个弹簧（Bouncy）
+    return (1.0 - s) * 120.0;
+}
+
+// 卡片依次进入：第 index 张卡片的偏移
+fn card_entry(t, index) {
+    let delay = index * 0.08;
+    let p = clamp((t - delay) / 0.4, 0.0, 1.0);
+    return (1.0 - spring(p, 0.25, 0.45)) * 60.0;
+}
+
+// 一次性演出：改剧情状态 + 抛出演出指令
+fn opening() {
+    set("看过开场", true);        // 直接写进剧情变量表
+    emit("bgm", "rain_theme");    // UI 收到的事件
+    emit("cameraY", 40.0);
+    let beat = 0;
+    let i = 0;
+    while i < 3 {
+        beat = beat + spring(i * 0.35, 0.29, 0.75);
+        i = i + 1;
+    }
+    return beat;
+}
+```
+
+### 宿主内置函数
+
+| 分类 | 函数 | 说明 |
+|------|------|------|
+| 数学 | `sin cos sqrt abs floor round pow min max clamp lerp random` | 和表达式语言共用语义 |
+| 弹簧 | `spring(p, response, damping)` | 与 UI 完全同一套参数，采样出 0..1 的过程值 |
+| 缓动 | `ease(t)` `ease_out(t)` `bump(t, amp)` | 无动量缓动 / 二次缓出 / 衰减震荡 |
+| 演出 | `set(name, value)` | 写剧情变量（VM 执行完会同步） |
+| 演出 | `emit(channel, value)` | 抛出演出指令，播放器按需消费 |
+| 读取 | `get(name)` | 读剧情变量（好感度、flag…） |
+
+### 在终端里调脚本
+
+```bash
+# 列出所有函数
+galatea script scripts/intro.rs
+
+# 调一次，打印返回值 + set/emit
+galatea script scripts/intro.rs opening
+
+# 采样一条动画曲线（带 ASCII 柱状图，调手感用）
+galatea script scripts/intro.rs title_entry --sample 0 1 10
+```
+
+```
+  t= 0.000 v=120.0000 ########################################
+  t= 0.100 v= 27.4832 ########################################
+  t= 0.200 v=-23.4718    #####################################
+  t= 0.300 v= -7.9598                             ############
+  t= 0.400 v=  4.4264                                  #######
+```
+
+> 安全护栏：单次调用步数上限 20 万、调用深度 32 层、`while` 循环同样受步数保护，脚本写死循环只会让它自己停下来并报错。
+>
+> 路线图：后续会支持「Rust → wasm → 引擎内执行」，届时脚本可以使用完整的 Rust 语法与 crate；当前解释器已经覆盖了动画/演出需要的那部分。
+
+规格与测试见 [`crates/galatea-core/src/script.rs`](crates/galatea-core/src/script.rs)（7 个单元测试）与示例 [`scripts/intro.rs`](scripts/intro.rs)、[`samples/script_demo.json`](samples/script_demo.json)。
 
 ---
 
@@ -288,7 +360,9 @@ galatea/
 │       ├── engine/               #   expr / vm / lint 的 Dart 版
 │       ├── editor/               #   画布 / 属性面板 / 管理弹层
 │       └── player/               #   演出 UI
+├── scripts/intro.rs              # 自定义脚本示例（动画曲线 / 首界面）
 ├── samples/rain.json             # 示例剧本《雨声与自动门》
+├── samples/script_demo.json      # script 节点演示
 └── docs/                         # 设计文档
 ```
 
@@ -318,6 +392,7 @@ galatea lint <文件>          体检（有错误时退出码 1，可直接进 C
 galatea play <文件>          终端试玩
 galatea fmt  <文件>          规范化 JSON 格式
 galatea stat <文件>          节点/字数/结局/覆盖率统计
+galatea script <脚本.rs>     跑自定义脚本（列函数/调函数/采样曲线）
 ```
 </details>
 

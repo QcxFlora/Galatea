@@ -173,6 +173,14 @@ pub enum NodeKind {
     Return,
     /// 结局
     End { ending: String, text: String },
+    /// 自定义 Rust 脚本：执行一段自己的逻辑（动画曲线 / 首界面 / 小游戏）
+    /// `code` 是内联源码，`src` 是相对路径（二选一）
+    Script {
+        code: Option<String>,
+        src: Option<String>,
+        entry: String,
+        next: Option<String>,
+    },
 }
 
 impl NodeKind {
@@ -186,6 +194,7 @@ impl NodeKind {
             NodeKind::Call { .. } => "call",
             NodeKind::Return => "return",
             NodeKind::End { .. } => "end",
+            NodeKind::Script { .. } => "script",
         }
     }
 
@@ -199,6 +208,7 @@ impl NodeKind {
             NodeKind::Call { .. } => "#00b8d9",
             NodeKind::Return => "#8892a8",
             NodeKind::End { .. } => "#ff5c74",
+            NodeKind::Script { .. } => "#ff7a45",
         }
     }
 }
@@ -224,6 +234,11 @@ impl Node {
         let mut v = Vec::new();
         match &self.kind {
             NodeKind::Say { next, .. } | NodeKind::Set { next, .. } => {
+                if let Some(n) = next {
+                    v.push(("next".to_string(), n.clone()));
+                }
+            }
+            NodeKind::Script { next, .. } => {
                 if let Some(n) = next {
                     v.push(("next".to_string(), n.clone()));
                 }
@@ -266,6 +281,7 @@ impl Node {
         match (&mut self.kind, port) {
             (NodeKind::Say { next, .. }, "next") => *next = target,
             (NodeKind::Set { next, .. }, "next") => *next = target,
+            (NodeKind::Script { next, .. }, "next") => *next = target,
             (NodeKind::Branch { yes, .. }, "yes") => *yes = target,
             (NodeKind::Branch { no, .. }, "no") => *no = target,
             (NodeKind::Jump { to }, "to") => *to = target,
@@ -466,6 +482,21 @@ impl Story {
                     o.set("text", Json::s(text.clone()));
                 }
             }
+            NodeKind::Script {
+                code,
+                src,
+                entry,
+                next,
+            } => {
+                if let Some(c) = code {
+                    o.set("code", Json::s(c.clone()));
+                }
+                if let Some(s) = src {
+                    o.set("src", Json::s(s.clone()));
+                }
+                o.set("entry", Json::s(entry.clone()));
+                opt(next, "next", &mut o);
+            }
         }
         o
     }
@@ -583,6 +614,19 @@ impl Story {
                 },
                 "call" => NodeKind::Call {
                     to: nj.opt_str("to").filter(|s| !s.is_empty()),
+                    next: nj.opt_str("next").filter(|s| !s.is_empty()),
+                },
+                "script" => NodeKind::Script {
+                    code: nj.opt_str("code"),
+                    src: nj.opt_str("src"),
+                    entry: {
+                        let e = nj.s_or("entry", "main");
+                        if e.is_empty() {
+                            "main".to_string()
+                        } else {
+                            e
+                        }
+                    },
                     next: nj.opt_str("next").filter(|s| !s.is_empty()),
                 },
                 "return" => NodeKind::Return,
