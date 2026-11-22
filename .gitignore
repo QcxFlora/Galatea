@@ -1,0 +1,24 @@
+# Rust
+/target
+**/*.rs.bk
+
+# Dart / Flutter
+.dart_tool/
+.flutter-plugins*
+.packages
+build/
+app/.flutter-plugins*
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 运行时产物
+*.gala.json.bak
+save.json
+*.save.json
