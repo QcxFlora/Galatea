@@ -9,6 +9,7 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../engine/game_launcher.dart';
 import '../engine/spring.dart';
 import '../editor/editor_page.dart';
 import '../platform/orientation.dart';
@@ -85,6 +86,17 @@ class _HomePageState extends State<HomePage> {
     if (title == null || title.isEmpty) return;
     final p = await ProjectStore.create(title);
     await _open(p);
+  }
+
+  /// 把最近一本书交给 Godot 运行时（3D 演出）
+  Future<void> _play3d() async {
+    final books = await ProjectStore.listGal();
+    if (books.isEmpty) {
+      _toast('书柜还是空的，先放一本书进来');
+      return;
+    }
+    final msg = await launchWithProject(books.first.path);
+    _toast(msg);
   }
 
   Future<void> _openSample() async {
@@ -165,6 +177,7 @@ class _HomePageState extends State<HomePage> {
                   onNew: _newBook,
                   onImport: _import,
                   onSample: _openSample,
+                  onPlay3d: _play3d,
                 ),
                 Expanded(
                   child: _loading
@@ -232,11 +245,13 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onNew;
   final VoidCallback onImport;
   final VoidCallback onSample;
+  final VoidCallback onPlay3d;
 
   const _TopBar({
     required this.onNew,
     required this.onImport,
     required this.onSample,
+    required this.onPlay3d,
   });
 
   @override
@@ -291,6 +306,8 @@ class _TopBar extends StatelessWidget {
           _RoundAction(icon: Icons.folder_open, onTap: onImport),
           const SizedBox(width: 8),
           _RoundAction(icon: Icons.download_outlined, onTap: onSample),
+          const SizedBox(width: 8),
+          _RoundAction(icon: Icons.view_in_ar, onTap: onPlay3d),
         ],
       ),
     );

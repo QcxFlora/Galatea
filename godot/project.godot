@@ -1,0 +1,32 @@
+; Galatea 运行时 —— Godot 4 工程
+; 用 GDExtension 把 galatea-core（Rust）挂进来：读 .gal、跑剧情、驱动 3D
+
+config_version=5
+
+[application]
+config/name="Galatea"
+config/description="思维导图式 Galgame 引擎的 3D 运行时"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.3", "Forward Plus")
+config/icon="res://icon.svg"
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/handheld/orientation=1
+window/stretch/mode="canvas_items"
+
+[rendering]
+renderer/rendering_method="forward_plus"
+renderer/rendering_method.mobile="mobile"
+anti_aliasing/quality/msaa_3d=2
+environment/defaults/default_clear_color=Color(0.043, 0.05, 0.071, 1)
+
+[input_devices]
+pointing/emulate_touch_from_mouse=true
+
+[physics]
+common/physics_ticks_per_second=60
+
+[gdextension]
+; 编译 gdext 后把 .gdextension 放这里

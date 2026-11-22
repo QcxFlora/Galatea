@@ -101,6 +101,11 @@ fn is_precompressed(name: &str) -> bool {
         .any(|ext| l.ends_with(ext))
 }
 
+/// 原始 deflate 字节（PNG 编码也用这个）
+pub fn deflate_bytes(data: &[u8]) -> Result<Vec<u8>, String> {
+    deflate(data)
+}
+
 /// 只算压缩后长度（给打包器比价用）
 pub fn deflate_len(data: &[u8]) -> usize {
     deflate(data).map(|v| v.len()).unwrap_or(data.len())

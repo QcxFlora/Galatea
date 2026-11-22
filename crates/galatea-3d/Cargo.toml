@@ -1,0 +1,13 @@
+[package]
+name = "galatea-3d"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Galatea 的 3D 渲染后端：C ABI 稳定接口 + 可替换后端（软件光栅 / Filament）"
+
+[lib]
+name = "galatea_3d"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+galatea-core = { path = "../galatea-core" }

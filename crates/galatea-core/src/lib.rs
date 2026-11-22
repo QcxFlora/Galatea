@@ -20,6 +20,7 @@ pub mod gal;
 pub mod graph;
 pub mod json;
 pub mod lint;
+pub mod scene3d;
 pub mod script;
 pub mod vm;
 

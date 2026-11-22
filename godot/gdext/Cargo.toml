@@ -1,0 +1,21 @@
+[package]
+name = "galatea-godot"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+description = "Galatea 的 Godot GDExtension：把 galatea-core 挂进 Godot 运行时"
+
+[lib]
+crate-type = ["cdylib"]
+
+[workspace]
+
+[dependencies]
+godot = { version = "0.2", features = ["api-4-3"] }
+galatea-core = { path = "../../crates/galatea-core" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

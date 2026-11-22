@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/galatea-core"]
+members = ["crates/galatea-core", "crates/galatea-3d"]
 resolver = "2"
 
 [workspace.package]
