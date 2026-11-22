@@ -27,12 +27,13 @@ jobs:
 
       - name: 自动版本号
         run: |
-          BASE=$(cat VERSION)
-          VER="${BASE}.${GITHUB_RUN_NUMBER}"
+          BASE=$(cat VERSION)                              # 0.2.0（三段基线）
+          VER="${BASE}.${GITHUB_RUN_NUMBER}"               # 0.2.0.57（给人看 / 文件名 / tag）
           echo "VER=$VER" >> "$GITHUB_ENV"
-          sed -i "s/^version = \".*\"$/version = \"$VER\"/" Cargo.toml
-          sed -i "s/^version: .*/version: $VER+$GITHUB_RUN_NUMBER/" app/pubspec.yaml
-          echo "── 版本：$VER"
+          # Cargo 与 Flutter 都只认三段 semver，构建号只能挂在后缀上：
+          sed -i "s/^version = \".*\"$/version = \"${BASE}-build.${GITHUB_RUN_NUMBER}\"/" Cargo.toml
+          sed -i "s/^version: .*/version: ${BASE}+${GITHUB_RUN_NUMBER}/" app/pubspec.yaml
+          echo "── 显示版本：$VER"
           grep -m1 '^version' Cargo.toml
           grep -m1 '^version:' app/pubspec.yaml
 
