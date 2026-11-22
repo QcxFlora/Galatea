@@ -103,7 +103,7 @@ jobs:
 
             思维导图式 Galgame 引擎的 Android 客户端（与 Web 先行版同源）。
 
-            **安装**：下载 `galatea-latest.apk`（最新）或 `galatea-${VER}.apk`（此版本），
+            **安装**：下载 `galatea-latest.apk`（最新）或 `galatea-${{ env.VER }}.apk`（此版本），
             允许「安装未知来源应用」后安装。
             首次启动进入首界面 → 「试玩示例」直接体验，或「新建剧本」开始画剧情图。
 
@@ -113,7 +113,7 @@ jobs:
 
             引擎核心与 Web 版同一份 JSON 格式，剧本可在任意端打开。
           files: |
-            out/galatea-${VER}.apk
+            out/galatea-${{ env.VER }}.apk
             out/galatea-latest.apk
           draft: false
           prerelease: true
