@@ -151,13 +151,11 @@ fn cmd_new(file: &str, title: String) -> Result<(), String> {
         y: 0.0,
         title: None,
         kind: galatea_core::NodeKind::Say {
-            speaker: Some("yuki".into()),
             text: "……你终于来了。".into(),
-            bg: None,
-            portrait: None,
-            cast: None,
-            art: None,
             next: Some("ask".into()),
+            cast: vec!["yuki".into()],
+            art: Vec::new(),
+            bg: Vec::new(),
         },
     });
     s.add_node(Node {
@@ -191,13 +189,11 @@ fn cmd_new(file: &str, title: String) -> Result<(), String> {
         y: 300.0,
         title: None,
         kind: galatea_core::NodeKind::Say {
-            speaker: Some("yuki".into()),
             text: "那就好。".into(),
-            bg: None,
-            portrait: None,
-            cast: None,
-            art: None,
             next: Some("end_good".into()),
+            cast: vec!["yuki".into()],
+            art: Vec::new(),
+            bg: Vec::new(),
         },
     });
     s.add_node(Node {
@@ -206,13 +202,11 @@ fn cmd_new(file: &str, title: String) -> Result<(), String> {
         y: 300.0,
         title: None,
         kind: galatea_core::NodeKind::Say {
-            speaker: None,
             text: "她的眼神暗了下去。".into(),
-            bg: None,
-            portrait: None,
-            cast: None,
-            art: None,
             next: Some("end_bad".into()),
+            cast: Vec::new(),
+            art: Vec::new(),
+            bg: Vec::new(),
         },
     });
     s.add_node(Story::mk_end("end_good", -180.0, 440.0, "good", "结局：如约"));

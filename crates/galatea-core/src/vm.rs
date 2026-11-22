@@ -31,6 +31,8 @@ pub enum Event {
         text: String,
         bg: Option<String>,
         portrait: Option<String>,
+        /// 多人同框时除第一张以外的立绘
+        extra_portraits: Vec<String>,
     },
     Choices {
         node: String,
@@ -296,49 +298,87 @@ impl Vm {
 
             match node.kind {
                 NodeKind::Say {
-                    speaker,
                     text,
-                    bg,
-                    portrait,
                     next,
                     cast,
                     art,
+                    bg,
                 } => {
                     self.push_snapshot();
 
-                    // art 端口 → 立绘方块里的真实资源路径
-                    let art_path = art.as_deref().and_then(|id| self.story.node(id)).and_then(|n| {
-                        match &n.kind {
+                    // art 端口 → 立绘方块里的真实资源路径（可多个，先取第一个）
+                    let art_paths: Vec<String> = art
+                        .iter()
+                        .filter_map(|id| self.story.node(id))
+                        .filter_map(|n| match &n.kind {
                             NodeKind::Portrait { asset, .. } => Some(asset.clone()),
                             _ => None,
+                        })
+                        .collect();
+
+                    // cast 端口 → 每个人的显示名（顺着 marker→label 或 character 解析）
+                    let mut names: Vec<String> = Vec::new();
+                    let mut first_color: Option<String> = None;
+                    for cid in &cast {
+                        let Some(cn) = self.story.node(cid) else {
+                            // 兼容：cast 里直接写了 characters 表的 key（旧剧本）
+                            let (nm, color, _) = self.speaker_info(&Some(cid.clone()), None);
+                            if !nm.is_empty() && !names.contains(&nm) {
+                                names.push(nm);
+                            }
+                            if first_color.is_none() {
+                                first_color = color;
+                            }
+                            continue;
+                        };
+                        let key = match &cn.kind {
+                            NodeKind::Character { key, .. } => key.clone(),
+                            NodeKind::Marker { tag, .. } => tag.clone(),
+                            NodeKind::Label { .. } => {
+                                // 直接连了显示名
+                                if let NodeKind::Label { text, .. } = &cn.kind {
+                                    names.push(text.clone());
+                                }
+                                continue;
+                            }
+                            _ => continue,
+                        };
+                        let (nm, color, _) = self.speaker_info(&Some(key), None);
+                        if !nm.is_empty() && !names.contains(&nm) {
+                            names.push(nm);
                         }
-                    });
-                    // cast 端口 → 角色方块的 key（speaker 没填时用它）
-                    let cast_key = cast.as_deref().and_then(|id| self.story.node(id)).and_then(|n| {
+                        if first_color.is_none() {
+                            first_color = color;
+                        }
+                    }
+
+                    // 多人同声时用「、」连起来；一个都没有 = 旁白
+                    let speaker_name = names.join("、");
+                    let speaker_key = cast.first().cloned();
+
+                    let bg_path = bg.first().and_then(|id| self.story.node(id)).and_then(|n| {
                         match &n.kind {
-                            NodeKind::Character { key, .. } => Some(key.clone()),
-                            // 标记名方块：tag 就是剧本里引用的标识
-                            NodeKind::Marker { tag, .. } => Some(tag.clone()),
+                            NodeKind::Background { asset, .. } => Some(asset.clone()),
                             _ => None,
                         }
                     });
-                    let who = speaker.clone().or(cast_key);
-                    let (name, color, portrait) =
-                        self.speaker_info(&who, art_path.or(portrait));
-                    self.log.push(if name.is_empty() {
+                    let portrait = art_paths.first().cloned();
+
+                    self.log.push(if speaker_name.is_empty() {
                         text.clone()
                     } else {
-                        format!("{}：{}", name, text)
+                        format!("{}：{}", speaker_name, text)
                     });
                     self.pc = next;
                     return Event::Say {
                         node: pc,
-                        speaker: who,
-                        speaker_name: name,
-                        color,
+                        speaker: speaker_key,
+                        speaker_name,
+                        color: first_color,
                         text,
-                        bg,
+                        bg: bg_path,
                         portrait,
+                        extra_portraits: art_paths.iter().skip(1).cloned().collect(),
                     };
                 }
                 NodeKind::Choice { prompt, options } => {

@@ -122,11 +122,14 @@
       "type": "say",
       "x": -320,
       "y": 200,
-      "speaker": "amiya",
-      "cast": "m_amiya",
-      "art": "art_amiya",
       "text": "博士，今天的作战报告……写完了吗？",
-      "next": "s3"
+      "next": "s3",
+      "cast": [
+        "m_amiya"
+      ],
+      "art": [
+        "art_amiya"
+      ]
     },
     {
       "id": "s3",
@@ -166,11 +169,14 @@
       "type": "say",
       "x": -620,
       "y": 820,
-      "speaker": "kalts",
-      "cast": "char_kalts",
-      "art": "art_kalts",
       "text": "是吗。拿来我看。",
-      "next": "s5"
+      "next": "s5",
+      "cast": [
+        "m_kalts"
+      ],
+      "art": [
+        "art_kalts"
+      ]
     },
     {
       "id": "s5",
@@ -185,11 +191,14 @@
       "type": "say",
       "x": -620,
       "y": 1220,
-      "speaker": "kalts",
-      "cast": "char_kalts",
-      "art": "art_kalts",
       "text": "这是上个月的零食采购单。你还在背面画了个笑脸。",
-      "next": "c2"
+      "next": "c2",
+      "cast": [
+        "m_kalts"
+      ],
+      "art": [
+        "art_kalts"
+      ]
     },
     {
       "id": "c2",
@@ -221,33 +230,42 @@
       "type": "say",
       "x": 40,
       "y": 820,
-      "speaker": "amiya",
-      "cast": "char_amiya",
-      "art": "art_amiya",
       "text": "就是那个……凯尔希医生说要交的那个……",
-      "next": "s9"
+      "next": "s9",
+      "cast": [
+        "m_amiya"
+      ],
+      "art": [
+        "art_amiya"
+      ]
     },
     {
       "id": "s9",
       "type": "say",
       "x": 40,
       "y": 1020,
-      "speaker": "angel",
-      "cast": "char_angel",
-      "art": "art_angel",
       "text": "博士晕倒了！快做人工呼吸！",
-      "next": "s10"
+      "next": "s10",
+      "cast": [
+        "m_angel"
+      ],
+      "art": [
+        "art_angel"
+      ]
     },
     {
       "id": "s10",
       "type": "say",
       "x": 40,
       "y": 1220,
-      "speaker": "chen",
-      "cast": "char_chen",
-      "art": "art_chen",
       "text": "谁在走廊里喊人工呼吸？这里是罗德岛，不是急诊室。",
-      "next": "s11"
+      "next": "s11",
+      "cast": [
+        "m_chen"
+      ],
+      "art": [
+        "art_chen"
+      ]
     },
     {
       "id": "s11",
@@ -297,6 +315,66 @@
       "y": 900,
       "title": "显示名",
       "text": "阿米娅"
+    },
+    {
+      "id": "m_kalts",
+      "type": "marker",
+      "x": -1160,
+      "y": 1040,
+      "title": "标记名 kalts",
+      "tag": "kalts",
+      "next": "l_kalts"
+    },
+    {
+      "id": "l_kalts",
+      "type": "label",
+      "x": -860,
+      "y": 1040,
+      "title": "显示名",
+      "text": "凯尔希"
+    },
+    {
+      "id": "m_angel",
+      "type": "marker",
+      "x": -1160,
+      "y": 1180,
+      "title": "标记名 angel",
+      "tag": "angel",
+      "next": "l_angel"
+    },
+    {
+      "id": "l_angel",
+      "type": "label",
+      "x": -860,
+      "y": 1180,
+      "title": "显示名",
+      "text": "能天使"
+    },
+    {
+      "id": "m_chen",
+      "type": "marker",
+      "x": -1160,
+      "y": 1320,
+      "title": "标记名 chen",
+      "tag": "chen",
+      "next": "l_chen"
+    },
+    {
+      "id": "l_chen",
+      "type": "label",
+      "x": -860,
+      "y": 1320,
+      "title": "显示名",
+      "text": "陈"
+    },
+    {
+      "id": "bg_store",
+      "type": "background",
+      "x": -860,
+      "y": 1320,
+      "title": "背景 · 便利店夜",
+      "asset": "assets/characters/amiya.webp",
+      "scene": "便利店·夜"
     }
   ],
   "groups": [
@@ -314,7 +392,14 @@
         "art_angel",
         "art_chen",
         "m_amiya",
-        "l_amiya"
+        "l_amiya",
+        "m_kalts",
+        "l_kalts",
+        "m_angel",
+        "l_angel",
+        "m_chen",
+        "l_chen",
+        "bg_store"
       ],
       "color": "#7aa2f7"
     },

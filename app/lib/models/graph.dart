@@ -291,11 +291,17 @@ class StoryNode {
   double y;
   String? title;
 
-  // 台词
-  String? speaker;
+  // 台词（v0.2：不再内嵌说话人/立绘，全部走连线）
+  String? speaker; // 仅兼容旧剧本，新数据不写
   String text;
   String? bg;
   String? portrait;
+  /// 说话人连线（可多个：多人同声）
+  List<String> casts;
+  /// 立绘连线（可多个：多人同框）
+  List<String> arts;
+  /// 背景连线（可多个，取第一个）
+  List<String> bgs;
 
   // 流程
   String? next; // say / set / call 的返回点
@@ -354,12 +360,18 @@ class StoryNode {
     this.code,
     this.entry = 'main',
     this.tag,
+    List<String>? casts,
+    List<String>? arts,
+    List<String>? bgs,
     this.asset,
     this.character,
     this.expr,
     this.scene,
     List<String>? portraits,
   })  : portraits = portraits ?? <String>[],
+        casts = casts ?? <String>[],
+        arts = arts ?? <String>[],
+        bgs = bgs ?? <String>[],
         options = options ?? <Choice>[],
         effects = effects ?? <Effect>[];
 
@@ -393,6 +405,9 @@ class StoryNode {
       code: asOptString(m['code']),
       entry: asString(m['entry'], fallback: 'main'),
       tag: asOptString(m['tag']) ?? asOptString(m['key']),
+      casts: _strList(m['cast']),
+      arts: _strList(m['art']),
+      bgs: _strList(m['bg']),
       asset: asOptString(m['asset']),
       character: asOptString(m['character']),
       expr: asOptString(m['expr']),
@@ -413,11 +428,11 @@ class StoryNode {
     if (title != null && title!.trim().isNotEmpty) m['title'] = title;
     switch (type) {
       case NodeType.say:
-        if (speaker != null && speaker!.isNotEmpty) m['speaker'] = speaker;
         m['text'] = text;
-        if (bg != null && bg!.isNotEmpty) m['bg'] = bg;
-        if (portrait != null && portrait!.isNotEmpty) m['portrait'] = portrait;
         if (next != null && next!.isNotEmpty) m['next'] = next;
+        if (casts.isNotEmpty) m['cast'] = casts;
+        if (arts.isNotEmpty) m['art'] = arts;
+        if (bgs.isNotEmpty) m['bg'] = bgs;
         break;
       case NodeType.choice:
         m['prompt'] = prompt;
@@ -504,6 +519,9 @@ class StoryNode {
         code: code,
         entry: entry,
         tag: tag,
+        casts: List<String>.from(casts),
+        arts: List<String>.from(arts),
+        bgs: List<String>.from(bgs),
         asset: asset,
         character: character,
         expr: expr,
@@ -522,6 +540,17 @@ class StoryNode {
 
     switch (type) {
       case NodeType.say:
+        add('next', next);
+        for (final c in casts) {
+          add('cast', c);
+        }
+        for (final a in arts) {
+          add('art', a);
+        }
+        for (final b in bgs) {
+          add('bg', b);
+        }
+        break;
       case NodeType.set:
       case NodeType.script:
         add('next', next);
@@ -572,6 +601,30 @@ class StoryNode {
       final i = int.tryParse(port.substring(port.startsWith('opt') ? 3 : 0));
       if (i != null && i >= 0 && i < options.length) {
         options[i].to = t ?? '';
+      }
+      return;
+    }
+    if (port == 'cast') {
+      if (t == null) {
+        casts.clear();
+      } else if (!casts.contains(t)) {
+        casts.add(t);
+      }
+      return;
+    }
+    if (port == 'art') {
+      if (t == null) {
+        arts.clear();
+      } else if (!arts.contains(t)) {
+        arts.add(t);
+      }
+      return;
+    }
+    if (port == 'bg') {
+      if (t == null) {
+        bgs.clear();
+      } else if (!bgs.contains(t)) {
+        bgs.add(t);
       }
       return;
     }
@@ -962,3 +1015,13 @@ double asDouble(dynamic v) {
 
 double _round1(double v) =>
     double.parse(v.toStringAsFixed(1)) == v ? v : (v * 10).roundToDouble() / 10;
+
+/// JSON 里的端口值可能是字符串也可能是数组
+List<String> _strList(dynamic v) {
+  if (v == null) return <String>[];
+  if (v is String) return v.isEmpty ? <String>[] : <String>[v];
+  if (v is List) {
+    return v.map((e) => '$e').where((e) => e.isNotEmpty).toList();
+  }
+  return <String>[];
+}

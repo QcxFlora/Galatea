@@ -342,156 +342,181 @@ class _Shelf extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 每层放 3 本，像真的架子
-    const perRow = 3;
-    final rows = <List<File>>[];
-    for (var i = 0; i < books.length; i += perRow) {
-      rows.add(books.sublist(i, math.min(i + perRow, books.length)));
-    }
-    return Column(
-      children: [
-        for (final row in rows) ...[
-          SizedBox(
-            height: 156,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (final f in row)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: _BookSpine(
-                        title: titles[f.path] ?? f.uri.pathSegments.last,
-                        index: books.indexOf(f),
-                        onTap: () => onTap(f),
-                        onLongPress: () => onLongPress(f),
-                      ),
-                    ),
-                  ),
-                // 补齐空位
-                for (var i = row.length; i < perRow; i++)
-                  const Expanded(child: SizedBox()),
-              ],
-            ),
-          ),
-          // 书架板
-          Container(
-            height: 3,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF3A3A3A), Color(0xFF1A1A1A)],
-              ),
-            ),
-          ),
-          const SizedBox(height: 26),
-        ],
-      ],
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      itemCount: books.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 14,
+        crossAxisSpacing: 14,
+        childAspectRatio: 0.82,
+      ),
+      itemBuilder: (_, i) {
+        final f = books[i];
+        return _CoverCard(
+          title: titles[f.path] ?? f.uri.pathSegments.last,
+          index: i,
+          sizeKb: f.existsSync() ? (f.lengthSync() / 1024).round() : 0,
+          onTap: () => onTap(f),
+          onLongPress: () => onLongPress(f),
+        );
+      },
     );
   }
 }
 
-class _BookSpine extends StatefulWidget {
+class _CoverCard extends StatefulWidget {
   final String title;
   final int index;
+  final int sizeKb;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
-  const _BookSpine({
+  const _CoverCard({
     required this.title,
     required this.index,
+    required this.sizeKb,
     required this.onTap,
     required this.onLongPress,
   });
 
   @override
-  State<_BookSpine> createState() => _BookSpineState();
+  State<_CoverCard> createState() => _CoverCardState();
 }
 
-class _BookSpineState extends State<_BookSpine> {
-  bool _pressed = false;
+class _CoverCardState extends State<_CoverCard> {
+  bool _down = false;
 
-  /// 按标题散列取一个灰阶（同一本书永远同色）
-  Color get _spineColor {
+  /// 按标题散列取一组冷色（同一本书永远同色）
+  List<Color> get _coverGradient {
     final h = widget.title.hashCode.abs();
-    final tones = [
-      const Color(0xFF232323),
-      const Color(0xFF2A2622),
-      const Color(0xFF1F2429),
-      const Color(0xFF262229),
-      const Color(0xFF2B2B2B),
-      const Color(0xFF22282A),
+    const palettes = [
+      [Color(0xFF232A38), Color(0xFF10141C)],
+      [Color(0xFF2B2334), Color(0xFF14101A)],
+      [Color(0xFF1F2A2A), Color(0xFF0E1414)],
+      [Color(0xFF2E2620), Color(0xFF16110D)],
+      [Color(0xFF242433), Color(0xFF111119)],
     ];
-    return tones[h % tones.length];
+    return palettes[h % palettes.length];
   }
 
-  /// 书脊上那道强调色，也是按标题取的（极窄一条）
-  Color get _edgeColor {
-    final h = widget.title.hashCode.abs();
-    const accents = [GColors.accent, Color(0xFFD6A3A0), Color(0xFFB8895F)];
-    return accents[(h ~/ 7) % accents.length];
-  }
+  Color get _edge => const [GColors.accent, Color(0xFFD6A3A0), Color(0xFFB8895F)][
+      (widget.title.hashCode.abs() ~/ 7) % 3];
 
   @override
   Widget build(BuildContext context) {
-    final height = 118.0 + (widget.title.hashCode.abs() % 3) * 14;
+    final first = widget.title.isEmpty ? '?' : widget.title.characters.first;
     return GestureDetector(
       onTap: widget.onTap,
       onLongPress: widget.onLongPress,
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedSlide(
-        offset: _pressed ? const Offset(0, 0.04) : Offset.zero,
-        duration: const Duration(milliseconds: 120),
+      onTapDown: (_) => setState(() => _down = true),
+      onTapUp: (_) => setState(() => _down = false),
+      onTapCancel: () => setState(() => _down = false),
+      child: AnimatedScale(
+        scale: _down ? 0.97 : 1,
+        duration: const Duration(milliseconds: 110),
         curve: Curves.easeOut,
         child: Container(
-          height: height,
           decoration: BoxDecoration(
-            color: _spineColor,
-            border: Border(
-              top: BorderSide(color: _edgeColor, width: 2),
-              left: const BorderSide(color: Color(0xFF141414), width: 1),
-              right: const BorderSide(color: Color(0xFF141414), width: 1),
-            ),
+            color: GColors.panel,
+            border: Border.all(color: GColors.line),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 10),
-              // 竖排书名
+              // 封面
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: RotatedBox(
-                    quarterTurns: 3,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        widget.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
-                          color: GColors.text,
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: _coverGradient,
+                    ),
+                  ),
+                  child: Stack(
+                    children: [
+                      // 极淡的轨道弧（来自星尘）
+                      Positioned(
+                        right: -40,
+                        top: -30,
+                        child: Container(
+                          width: 140,
+                          height: 140,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: Colors.white.withOpacity(0.06)),
+                          ),
                         ),
                       ),
-                    ),
+                      Center(
+                        child: Text(
+                          first,
+                          style: const TextStyle(
+                            fontSize: 40,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFEDEDED),
+                          ),
+                        ),
+                      ),
+                      // 左上角编号
+                      Positioned(
+                        left: 8,
+                        top: 7,
+                        child: Text(
+                          '${(widget.index + 1).toString().padLeft(2, '0')}',
+                          style: const TextStyle(
+                              fontSize: 8.5,
+                              fontFamily: 'monospace',
+                              letterSpacing: 1,
+                              color: Color(0xFF6E6E6E)),
+                        ),
+                      ),
+                      // 底部强调条
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: Container(height: 2, color: _edge),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              // 书脊底部的编号
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  '${(widget.index + 1).toString().padLeft(2, '0')}',
-                  style: const TextStyle(
-                      fontSize: 8.5,
-                      fontFamily: 'monospace',
-                      color: GColors.dim,
-                      letterSpacing: 1),
+              // 信息条
+              Container(
+                padding: const EdgeInsets.fromLTRB(9, 8, 9, 9),
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: GColors.line)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: GColors.text,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${widget.sizeKb} KB · .gal',
+                      style: const TextStyle(
+                          fontSize: 9,
+                          fontFamily: 'monospace',
+                          color: GColors.dim,
+                          letterSpacing: 0.6),
+                    ),
+                  ],
                 ),
               ),
             ],

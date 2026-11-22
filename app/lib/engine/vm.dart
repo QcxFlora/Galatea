@@ -26,6 +26,8 @@ class SayEvent extends VmEvent {
   final String text;
   final String? bg;
   final String? portrait;
+  /// 多人同框时除第一张外的立绘
+  final List<String> extraPortraits;
   const SayEvent({
     required this.node,
     required this.speaker,
@@ -34,6 +36,7 @@ class SayEvent extends VmEvent {
     required this.text,
     this.bg,
     this.portrait,
+    this.extraPortraits = const <String>[],
   });
 }
 
@@ -253,35 +256,65 @@ class Vm {
       switch (node.type) {
         case NodeType.say:
           _pushSnapshot();
-          // art 端口 → 立绘方块里的真实资源路径
-          String? artPath;
-          if (node.art != null && node.art!.isNotEmpty) {
-            final an = story.nodeById(node.art);
-            if (an != null && an.type == NodeType.portrait) artPath = an.asset;
-          }
-          // cast 端口 → 标记名方块 / 角色方块的 key
-          String? castKey;
-          if (node.cast != null && node.cast!.isNotEmpty) {
-            final cn = story.nodeById(node.cast);
-            if (cn != null) {
-              if (cn.type == NodeType.marker) castKey = cn.tag;
-              if (cn.type == NodeType.character) castKey = cn.tag;
+
+          // art 端口（多值）→ 立绘方块里的资源路径
+          final artPaths = <String>[];
+          for (final id in node.arts) {
+            final an = story.nodeById(id);
+            if (an != null && an.type == NodeType.portrait && an.asset != null) {
+              artPaths.add(an.asset!);
             }
           }
-          final who = (node.speaker != null && node.speaker!.isNotEmpty)
-              ? node.speaker
-              : castKey;
-          final info = _speakerInfo(who, artPath ?? node.portrait);
-          log.add(info.name.isEmpty ? node.text : '${info.name}：${node.text}');
+
+          // cast 端口（多值）→ 每个人的显示名
+          final names = <String>[];
+          String? firstKey;
+          for (final id in node.casts) {
+            final cn = story.nodeById(id);
+            if (cn == null) {
+              // 兼容：cast 里直接写了 characters 表的 key
+              final info = _speakerInfo(id, null);
+              if (info.name.isNotEmpty && !names.contains(info.name)) {
+                names.add(info.name);
+              }
+              firstKey ??= id;
+              continue;
+            }
+            if (cn.type == NodeType.label) {
+              if (cn.text.isNotEmpty && !names.contains(cn.text)) names.add(cn.text);
+              firstKey ??= cn.id;
+              continue;
+            }
+            final key = cn.tag;
+            if (key == null || key.isEmpty) continue;
+            final info = _speakerInfo(key, null);
+            if (info.name.isNotEmpty && !names.contains(info.name)) {
+              names.add(info.name);
+            }
+            firstKey ??= key;
+          }
+
+          // bg 端口（取第一个）
+          String? bgPath;
+          if (node.bgs.isNotEmpty) {
+            final bn = story.nodeById(node.bgs.first);
+            if (bn != null && bn.type == NodeType.background) bgPath = bn.asset;
+          }
+
+          final display = names.join('、');
+          final info = _speakerInfo(firstKey, artPaths.isNotEmpty ? artPaths.first : node.portrait);
+          log.add(display.isEmpty ? node.text : '$display：${node.text}');
           pc = node.next;
           return SayEvent(
             node: id,
-            speaker: who,
-            speakerName: info.name,
+            speaker: firstKey,
+            speakerName: display,
             color: info.color,
             text: node.text,
-            bg: node.bg,
-            portrait: info.portrait,
+            bg: bgPath ?? node.bg,
+            portrait: artPaths.isNotEmpty ? artPaths.first : info.portrait,
+            extraPortraits:
+                artPaths.length > 1 ? artPaths.sublist(1) : const <String>[],
           );
         case NodeType.choice:
           final views = <OptionView>[];

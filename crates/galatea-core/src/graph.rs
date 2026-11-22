@@ -142,16 +142,15 @@ impl std::fmt::Display for Choice {
 #[derive(Debug, Clone)]
 pub enum NodeKind {
     /// 一句台词（旁白则 speaker 为空）
+    /// 台词。**不含任何说话人/立绘字段**——全部靠连线：
+    /// `cast` 说这句话的人（可多个，多人同声）、`art` 这一格的立绘（可多个，多人同框）、
+    /// `bg` 背景。没有任何 cast 连线 = 旁白。
     Say {
-        speaker: Option<String>,
         text: String,
-        bg: Option<String>,
-        portrait: Option<String>,
         next: Option<String>,
-        /// 连到 character 方块（这句是谁说的）
-        cast: Option<String>,
-        /// 连到 portrait 方块（这句用哪张立绘）
-        art: Option<String>,
+        cast: Vec<String>,
+        art: Vec<String>,
+        bg: Vec<String>,
     },
     /// 选项分支
     Choice {
@@ -293,15 +292,21 @@ impl Node {
     pub fn ports(&self) -> Vec<(String, String)> {
         let mut v = Vec::new();
         match &self.kind {
-            NodeKind::Say { next, cast, art, .. } => {
+            NodeKind::Say {
+                next, cast, art, bg, ..
+            } => {
                 if let Some(n) = next {
                     v.push(("next".to_string(), n.clone()));
                 }
-                if let Some(c) = cast {
+                // 同一端口名出现多次 = 一对多（多个人连同一句台词）
+                for c in cast {
                     v.push(("cast".to_string(), c.clone()));
                 }
-                if let Some(a) = art {
+                for a in art {
                     v.push(("art".to_string(), a.clone()));
+                }
+                for b in bg {
+                    v.push(("bg".to_string(), b.clone()));
                 }
             }
             NodeKind::Set { next, .. } => {
@@ -364,8 +369,30 @@ impl Node {
     pub fn set_port(&mut self, port: &str, target: Option<String>) {
         match (&mut self.kind, port) {
             (NodeKind::Say { next, .. }, "next") => *next = target,
-            (NodeKind::Say { cast, .. }, "cast") => *cast = target,
-            (NodeKind::Say { art, .. }, "art") => *art = target,
+            (NodeKind::Say { cast, .. }, "cast") => match target {
+                Some(t) => {
+                    if !cast.contains(&t) {
+                        cast.push(t);
+                    }
+                }
+                None => cast.clear(),
+            },
+            (NodeKind::Say { art, .. }, "art") => match target {
+                Some(t) => {
+                    if !art.contains(&t) {
+                        art.push(t);
+                    }
+                }
+                None => art.clear(),
+            },
+            (NodeKind::Say { bg, .. }, "bg") => match target {
+                Some(t) => {
+                    if !bg.contains(&t) {
+                        bg.push(t);
+                    }
+                }
+                None => bg.clear(),
+            },
             (NodeKind::Character { next, .. }, "next") => *next = target,
             (NodeKind::Portrait { next, .. }, "next") => *next = target,
             (NodeKind::Background { next, .. }, "next") => *next = target,
@@ -523,21 +550,32 @@ impl Story {
         };
         match &n.kind {
             NodeKind::Say {
-                speaker,
                 text,
-                bg,
-                portrait,
                 next,
                 cast,
                 art,
+                bg,
             } => {
-                opt(speaker, "speaker", &mut o);
                 o.set("text", Json::s(text.clone()));
-                opt(bg, "bg", &mut o);
-                opt(portrait, "portrait", &mut o);
                 opt(next, "next", &mut o);
-                opt(cast, "cast", &mut o);
-                opt(art, "art", &mut o);
+                if !cast.is_empty() {
+                    o.set(
+                        "cast",
+                        Json::Arr(cast.iter().map(|x| Json::s(x.clone())).collect()),
+                    );
+                }
+                if !art.is_empty() {
+                    o.set(
+                        "art",
+                        Json::Arr(art.iter().map(|x| Json::s(x.clone())).collect()),
+                    );
+                }
+                if !bg.is_empty() {
+                    o.set(
+                        "bg",
+                        Json::Arr(bg.iter().map(|x| Json::s(x.clone())).collect()),
+                    );
+                }
             }
             NodeKind::Choice { prompt, options } => {
                 o.set("prompt", Json::s(prompt.clone()));
@@ -833,15 +871,27 @@ impl Story {
                     scene: nj.opt_str("scene").filter(|s| !s.is_empty()),
                     next: nj.opt_str("next").filter(|s| !s.is_empty()),
                 },
-                _ => NodeKind::Say {
-                    speaker: nj.opt_str("speaker").filter(|s| !s.is_empty()),
-                    text: nj.s_or("text", ""),
-                    bg: nj.opt_str("bg").filter(|s| !s.is_empty()),
-                    portrait: nj.opt_str("portrait").filter(|s| !s.is_empty()),
-                    next: nj.opt_str("next").filter(|s| !s.is_empty()),
-                    cast: nj.opt_str("cast").filter(|s| !s.is_empty()),
-                    art: nj.opt_str("art").filter(|s| !s.is_empty()),
-                },
+                _ => {
+                    // 端口值既接受字符串也接受字符串数组
+                    let many = |key: &str| -> Vec<String> {
+                        match nj.get(key) {
+                            Some(Json::Str(x)) if !x.is_empty() => vec![x.clone()],
+                            Some(Json::Arr(a)) => a
+                                .iter()
+                                .filter_map(|v| v.as_str().map(|x| x.to_string()))
+                                .filter(|x| !x.is_empty())
+                                .collect(),
+                            _ => Vec::new(),
+                        }
+                    };
+                    NodeKind::Say {
+                        text: nj.s_or("text", ""),
+                        next: nj.opt_str("next").filter(|s| !s.is_empty()),
+                        cast: many("cast"),
+                        art: many("art"),
+                        bg: many("bg"),
+                    }
+                }
             };
             let node = Node {
                 id,
@@ -892,13 +942,12 @@ impl Story {
             y,
             title: None,
             kind: NodeKind::Say {
-                speaker: speaker.map(|s| s.to_string()),
                 text: text.to_string(),
-                bg: None,
-                portrait: None,
                 next: None,
-                cast: None,
-                art: None,
+                // 兼容旧调用：传了 speaker 就自动接一个同名标记名
+                cast: speaker.map(|s| vec![s.to_string()]).unwrap_or_default(),
+                art: Vec::new(),
+                bg: Vec::new(),
             },
         }
     }
@@ -1047,9 +1096,16 @@ mod tests {
             parent: None,
         });
 
-        // 端口：台词连到了角色与立绘
-        assert_eq!(s.node("s1").unwrap().port_target("cast"), Some("c1".into()));
-        assert_eq!(s.node("s1").unwrap().port_target("art"), Some("p1".into()));
+        // 端口：台词连到了角色与立绘（cast 是多值端口，先有 mk_say 传的 speaker）
+        let say_node = s.node("s1").unwrap();
+        let casts: Vec<String> = say_node
+            .ports()
+            .into_iter()
+            .filter(|(p, _)| p == "cast")
+            .map(|(_, t)| t)
+            .collect();
+        assert!(casts.contains(&"c1".to_string()), "cast 里应该有 c1：{:?}", casts);
+        assert_eq!(say_node.port_target("art"), Some("p1".into()));
 
         // JSON 往返
         let text = s.to_json_string_pretty();
