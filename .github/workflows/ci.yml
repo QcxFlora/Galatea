@@ -22,6 +22,26 @@ jobs:
           cargo run -q -p galatea-core --bin galatea -- fmt samples/rain.json
           git diff --exit-code samples/rain.json
 
+  web:
+    name: Web 先行版
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 语法检查
+        run: |
+          python3 - <<'EOF'
+          import re
+          html = open('web/index.html', encoding='utf-8').read()
+          m = re.search(r'<script>([\s\S]*)</script>', html)
+          open('/tmp/galatea.js', 'w', encoding='utf-8').write(m.group(1))
+          EOF
+          node --check /tmp/galatea.js
+      - name: 核心逻辑测试（表达式 / VM / lint）
+        run: node web/test_logic.js
+
   flutter:
     name: Flutter 端
     runs-on: ubuntu-latest

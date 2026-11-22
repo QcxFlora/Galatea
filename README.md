@@ -36,7 +36,8 @@ Rust 核心 + Flutter 编辑器，把整部视觉小说当作一张可拖拽、�
 | 日期 | 版本 | 内容 |
 |------|------|------|
 | ✨ 2026-11-22 | 0.1.0 | 初始版本：`galatea-core` 引擎核心（JSON / 表达式 / 剧情图 / VM / lint / CLI，19 个单元测试全绿）；示例剧本《雨声与自动门》上线；Flutter 端模型层与 VM 的 Dart 实现 |
-| 🧭 计划 | — | lilt 风格弹簧动画库、扁平化 3D 渲染层、自定义 Rust 脚本宿主、`galatea pack` 打包器 |
+| 🌐 2026-11-22 | 0.1.0 | **Web 先行版**上线（`web/index.html` 单文件，含 lilt 弹簧动画 + 扁平 3D 首界面 + 思维导图编辑器 + 播放器，37 项逻辑测试通过，手机浏览器可玩） |
+| 🧭 计划 | — | 自定义 Rust 脚本宿主、`galatea pack` 打包器、Flutter 桌面端 |
 
 ---
 
@@ -90,6 +91,19 @@ cargo run -p galatea-core --bin galatea -- stat 我的剧本.json
 ```bash
 cargo run -p galatea-core --bin galatea -- play samples/rain.json
 ```
+
+### 最快体验：Web 先行版（无需安装任何东西）
+
+```bash
+# 本地起个静态服务（直接双击 file:// 打开也行，但 localStorage 会被部分浏览器限制）
+cd web && python3 -m http.server 8000
+# 浏览器打开 http://localhost:8000 —— 手机上也能玩
+```
+
+`web/index.html` 是一个 87KB 的单文件：内置 lilt 式弹簧动画引擎、扁平 3D 首界面、
+完整的思维导图编辑器（拖节点 / 拉线连线 / 属性面板 / 实时体检 / 自动布局 / localStorage 自动保存）
+和播放器（打字机 / 变量插值 / 撤销 / 存读档 / 回想 / 自动模式）。核心逻辑（表达式 / VM / lint）
+与 Rust 版同构，`node web/test_logic.js` 跑 37 项对齐测试。
 
 ### Flutter 端
 
