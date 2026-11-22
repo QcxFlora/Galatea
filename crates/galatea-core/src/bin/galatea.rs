@@ -11,7 +11,9 @@
 use galatea_core::graph::{Character, Node, Story};
 use galatea_core::json::Json;
 use galatea_core::lint::{self, Level};
+use galatea_core::gal;
 use galatea_core::script::{Script, Value as ScriptValue};
+use std::collections::BTreeMap;
 use galatea_core::vm::{Event, Vm};
 use std::io::{self, BufRead, Write};
 
@@ -20,6 +22,10 @@ fn main() {
     if args.is_empty() {
         usage();
         std::process::exit(2);
+    }
+    if args[0] == "--version" || args[0] == "-V" || args[0] == "version" {
+        println!("galatea {}  (.gal v1)", galatea_core::VERSION);
+        return;
     }
     let cmd = args[0].clone();
     let file = args.get(1).cloned().unwrap_or_default();
@@ -31,6 +37,9 @@ fn main() {
         "new" | "init" => cmd_new(&file, rest.first().cloned().unwrap_or_else(|| "未命名".into())),
         "stat" | "stats" => cmd_stat(&file),
         "script" | "sc" => cmd_script(&file, &rest),
+        "pack" | "p" => cmd_pack(&file, &rest),
+        "unpack" | "u" => cmd_unpack(&file, &rest),
+        "info" | "i" => cmd_info(&file),
         "help" | "-h" | "--help" => {
             usage();
             Ok(())
@@ -56,11 +65,21 @@ fn usage() {
     println!("  galatea fmt  <文件>          规范化格式");
     println!("  galatea stat <文件>          统计");
     println!("  galatea script <脚本.rs> [函数] [参数…]   跑自定义脚本");
+    println!("  galatea pack   <剧本.json> [-o 作品.gal]  打包成 .gal（压缩）");
+    println!("  galatea unpack <作品.gal>  [-o 目录]      解开 .gal");
+    println!("  galatea info   <作品.gal>                 查看包内容与压缩率");
     println!("         --sample <起> <止> <步数>            采样一条动画曲线");
 }
 
 fn load(file: &str) -> Result<Story, String> {
-    let src = std::fs::read_to_string(file).map_err(|e| format!("读不到 {}：{}", file, e))?;
+    let bytes = std::fs::read(file).map_err(|e| format!("读不到 {}：{}", file, e))?;
+    let src = if bytes.starts_with(gal::MAGIC) {
+        let arc = gal::parse(&bytes)?;
+        String::from_utf8(arc.read("story.gala.json")?)
+            .map_err(|e| format!(".gal 里的剧本不是 UTF-8：{}", e))?
+    } else {
+        String::from_utf8(bytes).map_err(|e| format!("{} 不是 UTF-8：{}", file, e))?
+    };
     Story::from_json_str(&src)
 }
 
@@ -456,4 +475,124 @@ fn interpolate(vm: &Vm, text: &str) -> String {
     }
     out.push_str(rest);
     out
+}
+
+fn human(n: u64) -> String {
+    if n >= 1024 * 1024 {
+        format!("{:.1}MB", n as f64 / 1048576.0)
+    } else if n >= 1024 {
+        format!("{:.1}KB", n as f64 / 1024.0)
+    } else {
+        format!("{}B", n)
+    }
+}
+
+fn cmd_pack(story_path: &str, args: &[String]) -> Result<(), String> {
+    let path = std::path::Path::new(story_path);
+    let json = std::fs::read_to_string(path)
+        .map_err(|e| format!("读不到 {}：{}", story_path, e))?;
+    let dir = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+
+    let mut files: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+    files.insert("story.gala.json".to_string(), json.clone().into_bytes());
+
+    // 资源可能在剧本目录、app/、web/ 或当前目录下，挨个找
+    let candidates: Vec<std::path::PathBuf> = vec![
+        dir.to_path_buf(),
+        dir.join("..").join("app"),
+        dir.join("..").join("web"),
+        std::path::PathBuf::from("."),
+        std::path::PathBuf::from(".."),
+    ];
+    let mut missing = Vec::new();
+    for rel in gal::collect_assets(&json) {
+        let mut found = None;
+        for base in &candidates {
+            let p = base.join(&rel);
+            if p.is_file() {
+                found = Some(p);
+                break;
+            }
+        }
+        match found.and_then(|p| std::fs::read(p).ok()) {
+            Some(b) => {
+                // 用剧本里的相对路径做条目名，解包后路径一致
+                files.insert(rel, b);
+            }
+            None => missing.push(rel),
+        }
+    }
+
+    let bytes = gal::pack(&files)?;
+    let out = args
+        .iter()
+        .position(|a| a == "-o" || a == "--out")
+        .and_then(|i| args.get(i + 1).cloned())
+        .unwrap_or_else(|| path.with_extension("gal").to_string_lossy().to_string());
+    std::fs::write(&out, &bytes).map_err(|e| format!("写不了 {}：{}", out, e))?;
+
+    let raw_total: usize = files.values().map(|v| v.len()).sum();
+    println!("📦 打包完成：{}", out);
+    println!("   条目 {} 个 · 原始 {} → 压缩后 {}", files.len(), human(raw_total as u64), human(bytes.len() as u64));
+    if raw_total > 0 {
+        println!("   压缩率 {:.1}%（省下 {}）", bytes.len() as f64 / raw_total as f64 * 100.0, human((raw_total.saturating_sub(bytes.len())) as u64));
+    }
+    for (name, data) in &files {
+        println!("     {:<44} {:>10}", name, human(data.len() as u64));
+    }
+    if !missing.is_empty() {
+        println!("   ⚠ 剧本里有 {} 个资源在磁盘上找不到（未打包）：", missing.len());
+        for m in missing.iter().take(8) {
+            println!("     - {}", m);
+        }
+    }
+    println!();
+    println!("   试玩：galatea play {}", out);
+    Ok(())
+}
+
+fn cmd_unpack(gal_path: &str, args: &[String]) -> Result<(), String> {
+    let bytes = std::fs::read(gal_path).map_err(|e| format!("读不到 {}：{}", gal_path, e))?;
+    let arc = gal::parse(&bytes)?;
+    let out = args
+        .iter()
+        .position(|a| a == "-o" || a == "--out")
+        .and_then(|i| args.get(i + 1).cloned())
+        .unwrap_or_else(|| {
+            gal_path
+                .trim_end_matches(".gal")
+                .to_string()
+        });
+    let dir = std::path::Path::new(&out);
+    for e in &arc.entries {
+        let p = dir.join(&e.name);
+        if let Some(parent) = p.parent() {
+            std::fs::create_dir_all(parent).map_err(|x| x.to_string())?;
+        }
+        let data = arc.read(&e.name)?;
+        std::fs::write(&p, &data).map_err(|x| format!("写不了 {}：{}", p.display(), x))?;
+    }
+    println!("📂 已解开 {} 个条目 → {}", arc.entries.len(), out);
+    Ok(())
+}
+
+fn cmd_info(gal_path: &str) -> Result<(), String> {
+    let bytes = std::fs::read(gal_path).map_err(|e| format!("读不到 {}：{}", gal_path, e))?;
+    let arc = gal::parse(&bytes)?;
+    println!("📦 {}  ({} 个条目)", gal_path, arc.entries.len());
+    println!("   文件大小 {} · 内容原始 {} · 压缩率 {:.1}%",
+        human(bytes.len() as u64),
+        human(arc.total_raw()),
+        arc.total_packed() as f64 / arc.total_raw().max(1) as f64 * 100.0);
+    println!();
+    println!("   {:<44} {:>9} {:>9} {:>7}  {}", "名称", "原始", "压缩后", "比例", "方式");
+    for e in &arc.entries {
+        println!("   {:<44} {:>9} {:>9} {:>6.1}%  {}",
+            e.name,
+            human(e.usize),
+            human(e.csize),
+            e.ratio() * 100.0,
+            if e.method == 1 { "deflate" } else { "原样" });
+    }
+    Ok(())
 }

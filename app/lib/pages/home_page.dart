@@ -13,6 +13,7 @@ import '../platform/orientation.dart';
 import '../models/graph.dart';
 import '../storage/store.dart';
 import '../theme.dart';
+import '../version.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -252,9 +253,10 @@ class _HomePageState extends State<HomePage> {
                     onLongPress: () => _deleteFile(f),
                   ),
                 const SizedBox(height: 26),
-                const Center(
-                  child: Text('GALATEA 0.1.0 · GPL-3.0 · 动画手感致敬 lilt',
-                      style: TextStyle(fontSize: 10.5, color: Color(0xFF5A6478))),
+                Center(
+                  child: Text('GALATEA $kAppVersion · .gal · GPL-3.0',
+                      style: const TextStyle(
+                          fontSize: 10.5, color: Color(0xFF5A6478))),
                 ),
               ],
             ),

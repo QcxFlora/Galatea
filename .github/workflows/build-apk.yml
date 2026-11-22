@@ -25,6 +25,17 @@ jobs:
           channel: stable
           cache: true
 
+      - name: 自动版本号
+        run: |
+          BASE=$(cat VERSION)
+          VER="${BASE}.${GITHUB_RUN_NUMBER}"
+          echo "VER=$VER" >> "$GITHUB_ENV"
+          sed -i "s/^version = \".*\"$/version = \"$VER\"/" Cargo.toml
+          sed -i "s/^version: .*/version: $VER+$GITHUB_RUN_NUMBER/" app/pubspec.yaml
+          echo "── 版本：$VER"
+          grep -m1 '^version' Cargo.toml
+          grep -m1 '^version:' app/pubspec.yaml
+
       - name: 依赖
         working-directory: app
         run: flutter pub get
@@ -66,32 +77,33 @@ jobs:
 
       - name: 构建 release APK
         working-directory: app
-        run: flutter build apk --release --no-tree-shake-icons --target-platform android-arm64
+        run: flutter build apk --release --no-tree-shake-icons --target-platform android-arm64 --dart-define=APP_VERSION=${{ env.VER }}
 
       - name: 收集产物
         run: |
           mkdir -p out
-          cp app/build/app/outputs/flutter-apk/app-release.apk out/galatea-0.1.0.apk
+          cp app/build/app/outputs/flutter-apk/app-release.apk "out/galatea-${VER}.apk"
+          cp "out/galatea-${VER}.apk" out/galatea-latest.apk
           ls -lh out/
-          echo "SIZE=$(stat -c%s out/galatea-0.1.0.apk)" >> $GITHUB_ENV
 
       - uses: actions/upload-artifact@v4
         with:
-          name: galatea-apk
-          path: out/galatea-0.1.0.apk
+          name: galatea-apk-${{ env.VER }}
+          path: out/galatea-*.apk
           retention-days: 30
 
       - name: 发布到 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.0
-          name: Galatea 0.1.0 · 先行版 APK
+          tag_name: v${{ env.VER }}
+          name: Galatea ${{ env.VER }}
           body: |
             ## Galatea 0.1.0 先行版
 
             思维导图式 Galgame 引擎的 Android 客户端（与 Web 先行版同源）。
 
-            **安装**：下载 `galatea-0.1.0.apk`，允许「安装未知来源应用」后安装。
+            **安装**：下载 `galatea-latest.apk`（最新）或 `galatea-${VER}.apk`（此版本），
+            允许「安装未知来源应用」后安装。
             首次启动进入首界面 → 「试玩示例」直接体验，或「新建剧本」开始画剧情图。
 
             **功能**：思维导图编辑器（拖拽 / 连线 / 属性面板 / 实时体检 / 自动布局）、
@@ -99,7 +111,9 @@ jobs:
             lilt 弹簧动画、扁平 3D 首界面。
 
             引擎核心与 Web 版同一份 JSON 格式，剧本可在任意端打开。
-          files: out/galatea-0.1.0.apk
+          files: |
+            out/galatea-${VER}.apk
+            out/galatea-latest.apk
           draft: false
           prerelease: true
         env:

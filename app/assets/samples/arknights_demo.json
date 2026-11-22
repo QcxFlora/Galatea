@@ -23,7 +23,7 @@
       "key": "amiya",
       "name": "阿米娅",
       "color": "#ff6f6f",
-      "portraits": ["assets/characters/amiya.png"]
+      "portraits": ["assets/characters/amiya.webp"]
     },
     {
       "id": "char_kalts",
@@ -34,7 +34,7 @@
       "key": "kalts",
       "name": "凯尔希",
       "color": "#8fa8c8",
-      "portraits": ["assets/characters/kalts.png"]
+      "portraits": ["assets/characters/kalts.webp"]
     },
     {
       "id": "char_angel",
@@ -45,7 +45,7 @@
       "key": "angel",
       "name": "能天使",
       "color": "#ff8c42",
-      "portraits": ["assets/characters/angel.png"]
+      "portraits": ["assets/characters/angel.webp"]
     },
     {
       "id": "char_chen",
@@ -56,7 +56,7 @@
       "key": "chen",
       "name": "陈",
       "color": "#6fa8dc",
-      "portraits": ["assets/characters/chen.png"]
+      "portraits": ["assets/characters/chen.webp"]
     },
 
     {
@@ -66,7 +66,7 @@
       "y": 0,
       "title": "阿米娅 · 常服",
       "character": "char_amiya",
-      "asset": "assets/characters/amiya.png",
+      "asset": "assets/characters/amiya.webp",
       "expr": "calm"
     },
     {
@@ -76,7 +76,7 @@
       "y": 220,
       "title": "凯尔希 · 常服",
       "character": "char_kalts",
-      "asset": "assets/characters/kalts.png",
+      "asset": "assets/characters/kalts.webp",
       "expr": "calm"
     },
     {
@@ -86,7 +86,7 @@
       "y": 440,
       "title": "能天使 · 常服",
       "character": "char_angel",
-      "asset": "assets/characters/angel.png",
+      "asset": "assets/characters/angel.webp",
       "expr": "smile"
     },
     {
@@ -96,7 +96,7 @@
       "y": 660,
       "title": "陈 · 常服",
       "character": "char_chen",
-      "asset": "assets/characters/chen.png",
+      "asset": "assets/characters/chen.webp",
       "expr": "calm"
     },
 

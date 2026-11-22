@@ -39,7 +39,10 @@ Rust 核心 + Flutter 编辑器，把整部视觉小说当作一张可拖拽、�
 | 🌐 2026-11-22 | 0.1.0 | **Web 先行版**上线（`web/index.html` 单文件，含 lilt 弹簧动画 + 扁平 3D 首界面 + 思维导图编辑器 + 播放器，37 项逻辑测试通过，手机浏览器可玩） |
 | ⚙️ 2026-11-22 | 0.1.0 | **自定义 Rust 脚本宿主**上线：Rust 安全子集解释器 + spring/ease/set/emit/get 内置函数 + `script` 节点类型 + `galatea script` 调参与曲线采样（7 个测试） |
 | 🎞️ 2026-11-22 | 0.1.0 | Flutter 端接入 lilt 弹簧动画（`spring.dart`：五预设 + SpringBuilder）；CI 三端全绿（Rust 26 测试 / Web 37 测试 / Flutter analyze+test） |
-| 🧭 计划 | — | Rust → wasm 脚本编译、`galatea pack` 打包器、Flutter 桌面端窗口与立绘资源管线 |
+| 📦 2026-11-22 | 0.2.0 | **`.gal` 作品包格式**：自定义容器 + 索引 + 分块 DEFLATE + CRC32 校验；图片转 WebP 使体积降 81%，完整作品包 264KB；`pack / unpack / info` 三个命令；`play` 可直接读 `.gal` |
+| 🔢 2026-11-22 | 0.2.0 | **自动版本号**：`VERSION` + CI 流水线号 → 写入 Cargo/pubspec/APK 名/Release tag，并通过 dart-define 注入 App 显示 |
+| 🎭 2026-11-22 | 0.2.0 | **方块体系扩充**：角色卡 / 立绘 / 背景成为图上方块，台词用 `cast` / `art` 端口连接；分组合并显示（每组独立开关） |
+| 🧭 计划 | — | Rust → wasm 脚本编译、画布合并块渲染、MCP 接口 |
 
 ---
 
@@ -196,6 +199,59 @@ aff >= 3 && met_yuki          好感度数值比较
 | 🎬 end | 红 | — | 结局 |
 
 **安全护栏**（都在 VM 里，不是 lint 建议）：连续 4096 个自动节点判死循环停机；子图嵌套 64 层判递归停机；撤销快照最多 256 张。
+
+---
+
+## 作品包 · `.gal`
+
+把「剧本 + 脚本 + 立绘 + 背景 + 音频」压成**一个文件**，直接丢给播放器。
+
+```bash
+galatea pack samples/arknights_demo.json -o game.gal
+galatea info game.gal          # 看条目与压缩率
+galatea play game.gal          # 直接玩
+galatea unpack game.gal -o out # 解开
+```
+
+```
+📦 打包完成：samples/arknights_demo.gal
+   条目 5 个 · 原始 268.5KB → 压缩后 264.0KB
+     assets/characters/amiya.webp    99.5KB
+     assets/characters/angel.webp    58.9KB
+     story.gala.json                  6.7KB → 2.0KB (deflate)
+```
+
+### 格式（v1）
+
+```
+magic "GAL\x01" │ version u16 │ flags │ count u32 │ index_len u32
+索引： name_len u16 │ name │ method u8 │ offset u64 │ csize u64 │ usize u64 │ crc32 u32
+数据： 各条目按索引顺序紧密排列
+```
+
+### 密度是怎么来的
+
+| 手段 | 效果 |
+|---|---|
+| 文本（剧本 JSON / 脚本源码）走 **DEFLATE level 9** | 6.7KB → 2.0KB（29.6%） |
+| 图片**先转 WebP**（质量 88，保留透明），再原样存入包 | 1364KB → 261KB（**省 81%**） |
+| 已压缩格式（png/jpg/webp/mp3/mp4/zip）**不二次压缩** | 避免又慢又变大 |
+| 每条目**先试压一次**，压不动就退回原样 | 绝不会因压缩反而变大 |
+| 索引只存名字 + 偏移，不冗余存路径表 | 头部开销 < 1KB |
+
+一个含 4 张高清立绘的完整作品包：**264 KB**。同样的内容散着放是 1.3 MB。
+
+### 自动版本号
+
+`VERSION` 文件是版本基线，CI 每次构建自动拼上流水线号：
+
+```
+VERSION = 0.2.0  →  构建产物 0.2.0.57
+```
+
+CI 会把它写进 `Cargo.toml`、`app/pubspec.yaml`、APK 文件名（`galatea-0.2.0.57.apk`）、
+Release tag（`v0.2.0.57`），并通过 `--dart-define=APP_VERSION=` 注入 App 内显示。
+每次 Release 同时挂一个固定名 `galatea-latest.apk`，方便直接下载最新版。
 
 ---
 
@@ -402,6 +458,8 @@ galatea play <文件>          终端试玩
 galatea fmt  <文件>          规范化 JSON 格式
 galatea stat <文件>          节点/字数/结局/覆盖率统计
 galatea script <脚本.rs>     跑自定义脚本（列函数/调函数/采样曲线）
+galatea pack <剧本.json>     打包成 .gal 作品包（压缩）
+galatea play <作品.gal>      直接试玩打包好的 .gal
 ```
 </details>
 

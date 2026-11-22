@@ -15,6 +15,7 @@
 //!    连线即流程，所以整部作品能被当成一张流程图审视。
 
 pub mod expr;
+pub mod gal;
 pub mod graph;
 pub mod json;
 pub mod lint;

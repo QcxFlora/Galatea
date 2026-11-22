@@ -301,10 +301,28 @@ impl Vm {
                     bg,
                     portrait,
                     next,
-                    ..
+                    cast,
+                    art,
                 } => {
                     self.push_snapshot();
-                    let (name, color, portrait) = self.speaker_info(&speaker, portrait);
+
+                    // art 端口 → 立绘方块里的真实资源路径
+                    let art_path = art.as_deref().and_then(|id| self.story.node(id)).and_then(|n| {
+                        match &n.kind {
+                            NodeKind::Portrait { asset, .. } => Some(asset.clone()),
+                            _ => None,
+                        }
+                    });
+                    // cast 端口 → 角色方块的 key（speaker 没填时用它）
+                    let cast_key = cast.as_deref().and_then(|id| self.story.node(id)).and_then(|n| {
+                        match &n.kind {
+                            NodeKind::Character { key, .. } => Some(key.clone()),
+                            _ => None,
+                        }
+                    });
+                    let who = speaker.clone().or(cast_key);
+                    let (name, color, portrait) =
+                        self.speaker_info(&who, art_path.or(portrait));
                     self.log.push(if name.is_empty() {
                         text.clone()
                     } else {
@@ -313,7 +331,7 @@ impl Vm {
                     self.pc = next;
                     return Event::Say {
                         node: pc,
-                        speaker,
+                        speaker: who,
                         speaker_name: name,
                         color,
                         text,
@@ -476,14 +494,34 @@ impl Vm {
     ) -> (String, Option<String>, Option<String>) {
         match key {
             None => (String::new(), None, None),
-            Some(k) => match self.story.characters.get(k) {
-                Some(c) => (
-                    c.name.clone(),
-                    c.color.clone(),
-                    portrait.or_else(|| c.avatar.clone()),
-                ),
-                None => (k.clone(), None, portrait),
-            },
+            Some(k) => {
+                // 1. 传统 characters 表
+                if let Some(c) = self.story.characters.get(k) {
+                    return (
+                        c.name.clone(),
+                        c.color.clone(),
+                        portrait.or_else(|| c.avatar.clone()),
+                    );
+                }
+                // 2. v0.2 的 character 方块（按 key 或方块 id 匹配）
+                for n in &self.story.nodes {
+                    if let NodeKind::Character {
+                        key,
+                        name,
+                        color,
+                        portraits,
+                        ..
+                    } = &n.kind
+                    {
+                        if key == k || &n.id == k {
+                            let p = portrait
+                                .or_else(|| portraits.first().cloned());
+                            return (name.clone(), color.clone(), p);
+                        }
+                    }
+                }
+                (k.clone(), None, portrait)
+            }
         }
     }
 
