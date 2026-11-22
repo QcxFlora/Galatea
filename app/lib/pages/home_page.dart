@@ -1,7 +1,6 @@
-/// 书柜 —— 主界面。
+/// 书柜 —— 主界面（视觉参考《来自星尘》的记录/道具界面）
 ///
-/// 一个 `.gal` 就是一本作品集，像书一样立在架子上：
-/// 竖排的书脊、按标题取的灰阶色、底部一排书架板。
+/// 语言：浅色渐变底 + 噪点 · 大圆角白卡片 · 细线分隔 · 青色点缀 · 大量留白
 library;
 
 import 'dart:io';
@@ -10,8 +9,8 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import '../editor/editor_page.dart';
 import '../engine/spring.dart';
+import '../editor/editor_page.dart';
 import '../platform/orientation.dart';
 import '../storage/store.dart';
 import '../theme.dart';
@@ -56,9 +55,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _open(LoadedProject p) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => EditorPage(project: p)),
-    );
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => EditorPage(project: p)));
     _refresh();
   }
 
@@ -67,7 +65,6 @@ class _HomePageState extends State<HomePage> {
     final title = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: GColors.panel,
         title: const Text('写一本新的'),
         content: TextField(
           controller: controller,
@@ -101,10 +98,8 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _import() async {
     try {
-      final res = await FilePicker.platform.pickFiles(
-        type: FileType.any,
-        allowMultiple: false,
-      );
+      final res = await FilePicker.platform
+          .pickFiles(type: FileType.any, allowMultiple: false);
       final path = res?.files.single.path;
       if (path == null) return;
       final p = await ProjectStore.importFrom(File(path));
@@ -118,10 +113,9 @@ class _HomePageState extends State<HomePage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: GColors.panel,
-        title: const Text('从书柜取下这本书？'),
+        title: const Text('从书柜取下这本？'),
         content: Text(_titles[f.path] ?? f.uri.pathSegments.last,
-            style: const TextStyle(fontSize: 12)),
+            style: const TextStyle(fontSize: 13)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -149,52 +143,68 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewPadding.bottom;
     return Scaffold(
-      backgroundColor: GColors.ink,
+      backgroundColor: GColors.bg,
       body: Stack(
         children: [
-          const Positioned.fill(child: _ShelfBackground()),
+          const Positioned.fill(child: _PaperBackground()),
           SafeArea(
             bottom: false,
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(20, 18, 20, 24 + bottom),
+            child: Column(
               children: [
-                _Header(
+                _TopBar(
                   onNew: _newBook,
                   onImport: _import,
                   onSample: _openSample,
                 ),
-                const SizedBox(height: 22),
-                if (_loading)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 40),
-                    child: Center(
-                        child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2))),
-                  )
-                else if (_books.isEmpty)
-                  const _EmptyShelf()
-                else
-                  _Shelf(
-                    books: _books,
-                    titles: _titles,
-                    onTap: (f) async {
-                      try {
-                        await _open(await ProjectStore.open(f));
-                      } catch (e) {
-                        _toast('打不开：$e');
-                      }
-                    },
-                    onLongPress: _delete,
-                  ),
-                const SizedBox(height: 22),
-                Center(
-                  child: Text(
-                    'GALATEA ${kAppVersion}  ·  .gal',
-                    style: const TextStyle(
-                        fontSize: 10, color: Color(0xFF5A6478), letterSpacing: 1),
-                  ),
+                Expanded(
+                  child: _loading
+                      ? const Center(
+                          child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2)))
+                      : ListView(
+                          padding: EdgeInsets.fromLTRB(20, 6, 20, 26 + bottom),
+                          children: [
+                            if (_books.isEmpty)
+                              _EmptyState(onSample: _openSample, onImport: _import)
+                            else
+                              for (var i = 0; i < _books.length; i++)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 14),
+                                  child: _RecordCard(
+                                    title: _titles[_books[i].path] ??
+                                        _books[i].uri.pathSegments.last,
+                                    sizeKb: _books[i].existsSync()
+                                        ? (_books[i].lengthSync() / 1024).round()
+                                        : 0,
+                                    seed: i,
+                                    latest: i == 0,
+                                    onTap: () async {
+                                      try {
+                                        await _open(await ProjectStore.open(
+                                            _books[i]));
+                                      } catch (e) {
+                                        _toast('打不开：$e');
+                                      }
+                                    },
+                                    onLongPress: () => _delete(_books[i]),
+                                  ),
+                                ),
+                            const SizedBox(height: 6),
+                            _StatsRow(count: _books.length),
+                            const SizedBox(height: 18),
+                            Center(
+                              child: Text(
+                                'GALATEA $kAppVersion   ·   .gal',
+                                style: const TextStyle(
+                                    fontSize: 10,
+                                    color: GColors.dim,
+                                    letterSpacing: 1.4),
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
               ],
             ),
@@ -205,14 +215,14 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// ------------------------------------------------------------------ 顶部
+// ------------------------------------------------------------------ 顶部栏
 
-class _Header extends StatelessWidget {
+class _TopBar extends StatelessWidget {
   final VoidCallback onNew;
   final VoidCallback onImport;
   final VoidCallback onSample;
 
-  const _Header({
+  const _TopBar({
     required this.onNew,
     required this.onImport,
     required this.onSample,
@@ -220,338 +230,382 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SpringBuilder(
-          begin: -40,
-          target: 0,
-          preset: SpringPreset.smooth,
-          builder: (_, dy) => Transform.translate(
-            offset: Offset(0, dy),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                const Text(
-                  'GALATEA',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 5,
-                    height: 1,
-                    color: GColors.textStrong,
-                  ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      child: Row(
+        children: [
+          // 左上角圆底 X（参考图的位置，这里作为"收起"视觉锚点）
+          SpringBuilder(
+            begin: -30,
+            target: 0,
+            preset: SpringPreset.smooth,
+            builder: (_, dy) => Transform.translate(
+              offset: Offset(0, dy),
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: const BoxDecoration(
+                  color: GColors.paper,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                        color: Color(0x14000000), blurRadius: 10, offset: Offset(0, 2)),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Container(width: 22, height: 3, color: GColors.accent),
-                const Spacer(),
-                Text('${kAppVersion}',
-                    style: const TextStyle(
-                        fontSize: 9.5, color: GColors.dim, letterSpacing: 1)),
-              ],
+                child: const Icon(Icons.auto_stories_outlined,
+                    size: 18, color: GColors.text),
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 6),
-        Text('我的书柜 · 每一本都是可以玩的故事',
-            style: labelStyle(color: GColors.dim, size: 10)),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            _ActionChip(
-              icon: Icons.add,
-              label: '新建',
-              accent: true,
-              onTap: onNew,
-            ),
-            const SizedBox(width: 8),
-            _ActionChip(
-              icon: Icons.folder_open,
-              label: '导入 .gal',
-              onTap: onImport,
-            ),
-            const SizedBox(width: 8),
-            _ActionChip(
-              icon: Icons.auto_stories,
-              label: '示例',
-              onTap: onSample,
-            ),
-          ],
-        ),
-      ],
+          const SizedBox(width: 12),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('书柜',
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: GColors.textStrong,
+                      letterSpacing: 2)),
+              Text('MY SHELF',
+                  style: TextStyle(
+                      fontSize: 8.5,
+                      color: GColors.dim,
+                      letterSpacing: 2.4)),
+            ],
+          ),
+          const Spacer(),
+          _RoundAction(icon: Icons.add, onTap: onNew, primary: true),
+          const SizedBox(width: 8),
+          _RoundAction(icon: Icons.folder_open, onTap: onImport),
+          const SizedBox(width: 8),
+          _RoundAction(icon: Icons.download_outlined, onTap: onSample),
+        ],
+      ),
     );
   }
 }
 
-class _ActionChip extends StatelessWidget {
+class _RoundAction extends StatelessWidget {
   final IconData icon;
-  final String label;
-  final bool accent;
   final VoidCallback onTap;
+  final bool primary;
 
-  const _ActionChip({
+  const _RoundAction({
     required this.icon,
-    required this.label,
     required this.onTap,
-    this.accent = false,
+    this.primary = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = accent ? GColors.accent : GColors.dim;
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        width: 38,
+        height: 38,
         decoration: BoxDecoration(
-          color: GColors.panel,
-          border: Border.all(color: accent ? GColors.accent : GColors.line),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 13, color: color),
-            const SizedBox(width: 6),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 11,
-                    color: accent ? GColors.textStrong : GColors.text,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.4)),
+          color: primary ? GColors.accent : GColors.paper,
+          shape: BoxShape.circle,
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x14000000), blurRadius: 10, offset: Offset(0, 2)),
           ],
         ),
+        child: Icon(icon,
+            size: 18, color: primary ? Colors.white : GColors.text),
       ),
     );
   }
 }
 
-// ------------------------------------------------------------------ 书架
+// ------------------------------------------------------------------ 记录卡
 
-class _Shelf extends StatelessWidget {
-  final List<File> books;
-  final Map<String, String> titles;
-  final void Function(File) onTap;
-  final void Function(File) onLongPress;
-
-  const _Shelf({
-    required this.books,
-    required this.titles,
-    required this.onTap,
-    required this.onLongPress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      itemCount: books.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 14,
-        crossAxisSpacing: 14,
-        childAspectRatio: 0.82,
-      ),
-      itemBuilder: (_, i) {
-        final f = books[i];
-        return _CoverCard(
-          title: titles[f.path] ?? f.uri.pathSegments.last,
-          index: i,
-          sizeKb: f.existsSync() ? (f.lengthSync() / 1024).round() : 0,
-          onTap: () => onTap(f),
-          onLongPress: () => onLongPress(f),
-        );
-      },
-    );
-  }
-}
-
-class _CoverCard extends StatefulWidget {
+class _RecordCard extends StatelessWidget {
   final String title;
-  final int index;
   final int sizeKb;
+  final int seed;
+  final bool latest;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
-  const _CoverCard({
+  const _RecordCard({
     required this.title,
-    required this.index,
     required this.sizeKb,
+    required this.seed,
+    required this.latest,
     required this.onTap,
     required this.onLongPress,
   });
 
-  @override
-  State<_CoverCard> createState() => _CoverCardState();
-}
-
-class _CoverCardState extends State<_CoverCard> {
-  bool _down = false;
-
-  /// 按标题散列取一组冷色（同一本书永远同色）
-  List<Color> get _coverGradient {
-    final h = widget.title.hashCode.abs();
-    const palettes = [
-      [Color(0xFF232A38), Color(0xFF10141C)],
-      [Color(0xFF2B2334), Color(0xFF14101A)],
-      [Color(0xFF1F2A2A), Color(0xFF0E1414)],
-      [Color(0xFF2E2620), Color(0xFF16110D)],
-      [Color(0xFF242433), Color(0xFF111119)],
+  /// 封面色（低饱和，按标题散列）
+  List<Color> get _cover {
+    const sets = [
+      [Color(0xFF6B7BB8), Color(0xFF3C4A78), Color(0xFF8E9BD0)],
+      [Color(0xFF7A8FA6), Color(0xFF46596E), Color(0xFF9DB0C2)],
+      [Color(0xFF8A7A9E), Color(0xFF53465F), Color(0xFFA897BA)],
+      [Color(0xFF5F8A82), Color(0xFF36544F), Color(0xFF87B4AB)],
     ];
-    return palettes[h % palettes.length];
+    return sets[title.hashCode.abs() % sets.length];
   }
-
-  Color get _edge => const [GColors.accent, Color(0xFFD6A3A0), Color(0xFFB8895F)][
-      (widget.title.hashCode.abs() ~/ 7) % 3];
 
   @override
   Widget build(BuildContext context) {
-    final first = widget.title.isEmpty ? '?' : widget.title.characters.first;
     return GestureDetector(
-      onTap: widget.onTap,
-      onLongPress: widget.onLongPress,
-      onTapDown: (_) => setState(() => _down = true),
-      onTapUp: (_) => setState(() => _down = false),
-      onTapCancel: () => setState(() => _down = false),
-      child: AnimatedScale(
-        scale: _down ? 0.97 : 1,
-        duration: const Duration(milliseconds: 110),
-        curve: Curves.easeOut,
-        child: Container(
-          decoration: BoxDecoration(
-            color: GColors.panel,
-            border: Border.all(color: GColors.line),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 封面
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: _coverGradient,
-                    ),
-                  ),
-                  child: Stack(
-                    children: [
-                      // 极淡的轨道弧（来自星尘）
-                      Positioned(
-                        right: -40,
-                        top: -30,
-                        child: Container(
-                          width: 140,
-                          height: 140,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                                color: Colors.white.withOpacity(0.06)),
-                          ),
-                        ),
-                      ),
-                      Center(
-                        child: Text(
-                          first,
-                          style: const TextStyle(
-                            fontSize: 40,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFFEDEDED),
-                          ),
-                        ),
-                      ),
-                      // 左上角编号
-                      Positioned(
-                        left: 8,
-                        top: 7,
-                        child: Text(
-                          '${(widget.index + 1).toString().padLeft(2, '0')}',
-                          style: const TextStyle(
-                              fontSize: 8.5,
-                              fontFamily: 'monospace',
-                              letterSpacing: 1,
-                              color: Color(0xFF6E6E6E)),
-                        ),
-                      ),
-                      // 底部强调条
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        child: Container(height: 2, color: _edge),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // 信息条
-              Container(
-                padding: const EdgeInsets.fromLTRB(9, 8, 9, 9),
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: GColors.line)),
-                ),
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Container(
+        height: 148,
+        decoration: BoxDecoration(
+          color: GColors.paper,
+          borderRadius: const BorderRadius.all(Radius.circular(14)),
+          border: Border.all(color: GColors.lineLight),
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x0D000000), blurRadius: 16, offset: Offset(0, 4)),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Row(
+          children: [
+            // 左：文字区
+            Expanded(
+              flex: 5,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 10, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (latest)
+                      Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: GColors.accent.withOpacity(0.12),
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(20)),
+                        ),
+                        child: const Text('最近记录',
+                            style: TextStyle(
+                                fontSize: 9,
+                                color: GColors.accent,
+                                letterSpacing: 0.8)),
+                      ),
+                    const Spacer(),
                     Text(
-                      widget.title,
-                      maxLines: 1,
+                      title,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 19,
                         fontWeight: FontWeight.w600,
-                        color: GColors.text,
-                        letterSpacing: 0.3,
+                        height: 1.25,
+                        color: GColors.textStrong,
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${widget.sizeKb} KB · .gal',
-                      style: const TextStyle(
-                          fontSize: 9,
-                          fontFamily: 'monospace',
-                          color: GColors.dim,
-                          letterSpacing: 0.6),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.cloud_done_outlined,
+                            size: 13, color: GColors.dim),
+                        const SizedBox(width: 5),
+                        Text('云端状态：已归档 · $sizeKb KB',
+                            style: const TextStyle(
+                                fontSize: 10, color: GColors.dim)),
+                      ],
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            // 右：封面拼贴
+            Expanded(
+              flex: 4,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: _cover,
+                      ),
+                    ),
+                  ),
+                  // 两道斜切色带（还原参考图的拼贴感）
+                  Positioned(
+                    right: -20,
+                    top: -30,
+                    bottom: -30,
+                    child: Transform.rotate(
+                      angle: math.pi / 9,
+                      child: Container(
+                        width: 54,
+                        color: Colors.white.withOpacity(0.14),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 44,
+                    top: -30,
+                    bottom: -30,
+                    child: Transform.rotate(
+                      angle: math.pi / 9,
+                      child: Container(
+                        width: 16,
+                        color: Colors.white.withOpacity(0.08),
+                      ),
+                    ),
+                  ),
+                  // 右下角书名首字
+                  Positioned(
+                    right: 12,
+                    bottom: 8,
+                    child: Text(
+                      title.isEmpty ? '?' : title.characters.first,
+                      style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white.withOpacity(0.85),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _EmptyShelf extends StatelessWidget {
-  const _EmptyShelf();
+// ------------------------------------------------------------------ 统计条
+
+class _StatsRow extends StatelessWidget {
+  final int count;
+
+  const _StatsRow({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      (count.toString(), '作品'),
+      ('1', '示例'),
+      ('13', '方块类型'),
+      ('37', '测试'),
+    ];
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+      decoration: BoxDecoration(
+        color: GColors.paper.withOpacity(0.7),
+        borderRadius: const BorderRadius.all(Radius.circular(14)),
+        border: Border.all(color: GColors.lineLight),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            Column(
+              children: [
+                Text(items[i].$1,
+                    style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w300,
+                        color: GColors.textStrong,
+                        height: 1)),
+                const SizedBox(height: 4),
+                Text(items[i].$2,
+                    style: const TextStyle(
+                        fontSize: 10, color: GColors.dim, letterSpacing: 1.2)),
+              ],
+            ),
+            if (i < items.length - 1)
+              Container(width: 1, height: 30, color: GColors.line),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final VoidCallback onSample;
+  final VoidCallback onImport;
+
+  const _EmptyState({required this.onSample, required this.onImport});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 46),
+      padding: const EdgeInsets.symmetric(vertical: 44),
       child: Column(
         children: [
           Container(
-            width: 54,
-            height: 54,
+            width: 74,
+            height: 74,
             decoration: BoxDecoration(
-              border: Border.all(color: GColors.line),
+              color: GColors.paper,
+              shape: BoxShape.circle,
+              border: Border.all(color: GColors.lineLight),
             ),
-            child: const Icon(Icons.menu_book_outlined,
-                color: GColors.dim, size: 22),
+            child: const Icon(Icons.auto_stories,
+                size: 30, color: GColors.accent),
           ),
-          const SizedBox(height: 14),
-          const Text('书架是空的',
-              style: TextStyle(fontSize: 13, color: GColors.text)),
+          const SizedBox(height: 18),
+          const Text('书柜是空的',
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: GColors.textStrong)),
           const SizedBox(height: 6),
-          const Text('新建一本，或者从「示例」开始',
-              style: TextStyle(fontSize: 11, color: GColors.dim)),
+          const Text('放一本书进来，或者先看看示例',
+              style: TextStyle(fontSize: 12, color: GColors.dim)),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _PillButton(label: '打开示例', onTap: onSample, primary: true),
+              const SizedBox(width: 10),
+              _PillButton(label: '导入 .gal', onTap: onImport),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _PillButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final bool primary;
+
+  const _PillButton({
+    required this.label,
+    required this.onTap,
+    this.primary = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        decoration: BoxDecoration(
+          color: primary ? GColors.accent : GColors.paper,
+          borderRadius: const BorderRadius.all(Radius.circular(22)),
+          border: Border.all(
+              color: primary ? GColors.accent : GColors.line),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+                color: primary ? Colors.white : GColors.text)),
       ),
     );
   }
@@ -559,8 +613,8 @@ class _EmptyShelf extends StatelessWidget {
 
 // ------------------------------------------------------------------ 背景
 
-class _ShelfBackground extends StatelessWidget {
-  const _ShelfBackground();
+class _PaperBackground extends StatelessWidget {
+  const _PaperBackground();
 
   @override
   Widget build(BuildContext context) {
@@ -569,15 +623,28 @@ class _ShelfBackground extends StatelessWidget {
         Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF0C0C0E), GColors.ink, Color(0xFF070708)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFFDFDFE), Color(0xFFF1F3F6), Color(0xFFE4E8EE)],
             ),
           ),
         ),
-        // 极淡的竖向木纹
-        Positioned.fill(
-          child: CustomPaint(painter: _GrainPainter()),
+        Positioned.fill(child: CustomPaint(painter: _GrainPainter())),
+        // 右上角极淡的青色光晕（参考图的氛围）
+        Positioned(
+          right: -80,
+          top: -60,
+          child: Container(
+            width: 280,
+            height: 280,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(colors: [
+                GColors.accent.withOpacity(0.10),
+                Colors.transparent,
+              ]),
+            ),
+          ),
         ),
       ],
     );
@@ -587,11 +654,12 @@ class _ShelfBackground extends StatelessWidget {
 class _GrainPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final p = Paint()
-      ..color = Colors.white.withOpacity(0.022)
-      ..strokeWidth = 1;
-    for (var x = 0.0; x < size.width; x += 13) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
+    // 细网格 + 噪点（用规则点阵模拟，性能友好）
+    final p = Paint()..color = const Color(0x08000000);
+    for (var y = 0.0; y < size.height; y += 4) {
+      for (var x = 0.0; x < size.width; x += 4) {
+        if (((x * 7 + y * 13) % 37) < 2) canvas.drawRect(Rect.fromLTWH(x, y, 1, 1), p);
+      }
     }
   }
 

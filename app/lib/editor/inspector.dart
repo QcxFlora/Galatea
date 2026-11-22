@@ -290,7 +290,7 @@ class Inspector extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             color: GColors.panel2,
-            borderRadius: BorderRadius.zero,
+            borderRadius: const BorderRadius.all(Radius.circular(10)),
             border: Border.all(color: GColors.line),
           ),
           child: DropdownButtonHideUnderline(
@@ -325,7 +325,7 @@ class Inspector extends StatelessWidget {
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: GColors.panel2,
-        borderRadius: BorderRadius.zero,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
         border: Border.all(color: GColors.line),
       ),
       child: Column(
@@ -412,7 +412,7 @@ class Inspector extends StatelessWidget {
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: GColors.bg,
-        borderRadius: BorderRadius.zero,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
         border: Border.all(color: GColors.line),
       ),
       child: Row(
@@ -429,7 +429,7 @@ class Inspector extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 6),
             decoration: BoxDecoration(
               color: GColors.panel2,
-              borderRadius: BorderRadius.zero,
+              borderRadius: const BorderRadius.all(Radius.circular(10)),
               border: Border.all(color: GColors.line),
             ),
             child: DropdownButtonHideUnderline(

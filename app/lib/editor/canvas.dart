@@ -662,7 +662,7 @@ class _ZoomBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: GColors.panel.withOpacity(0.9),
-        borderRadius: BorderRadius.zero,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
         border: Border.all(color: GColors.line),
       ),
       child: Row(

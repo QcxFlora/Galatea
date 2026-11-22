@@ -12,63 +12,66 @@ library;
 import 'package:flutter/material.dart';
 
 class GColors {
-  // ── 基础
-  static const ink = Color(0xFF0A0A0A); // 画布底
-  static const paper = Color(0xFFFFFFFF); // 纸面（对话框/弹层/白版面）
-  static const bg = ink; // 兼容旧名
-  static const panel = Color(0xFF141414); // 面板
-  static const panel2 = Color(0xFF1F1F1F); // 控件底
-  static const line = Color(0xFF2A2A2A); // 深底上的 1px 线
-  static const lineLight = Color(0xFFE8E8E8); // 白面板上的 1px 线
+  // ── 浅色底（参考《来自星尘》：白到浅灰蓝的渐变，大量留白）
+  static const ink = Color(0xFFEDEFF1); // 底色（浅灰白）
+  static const paper = Color(0xFFFFFFFF); // 卡片
+  static const bg = Color(0xFFF4F5F7);
+  static const panel = Color(0xFFFFFFFF);
+  static const panel2 = Color(0xFFF7F8FA);
+  static const line = Color(0xFFD9DCE1); // 细线
+  static const lineLight = Color(0xFFE9EBEE);
 
-  // ── 唯一的彩色
-  static const accent = Color(0xFFE4032E); // 瑞士红：选中 / 当前 / 错误 / 脚本
-  static const accent2 = Color(0xFFC4C4C4); // 旧名兼容（灰）
-  static const ok = Color(0xFFC4C4C4); // 完成态：灰
-  static const warn = Color(0xFFE8E8E8); // 警告：白，靠字重
-  static const err = Color(0xFFE4032E); // 错误：红
+  // ── 青色点缀（截图里的高亮色）
+  static const accent = Color(0xFF2FC8A8);
+  static const accent2 = Color(0xFF7BE3CB);
+  static const ok = Color(0xFF2FC8A8);
+  static const warn = Color(0xFFE0A458);
+  static const err = Color(0xFFD9534F);
 
-  // ── 文字
-  static const text = Color(0xFFE8E8E8);
-  static const textStrong = Color(0xFFFFFFFF);
-  static const dim = Color(0xFF8A8A8A);
+  // ── 文字（深炭灰，不是纯黑）
+  static const text = Color(0xFF23272E);
+  static const textStrong = Color(0xFF111318);
+  static const dim = Color(0xFF7A828E);
 
-  /// 节点类型：**不用颜色区分**，用灰阶亮度 + 字母标签（瑞士解法）
+  /// 节点类型：浅色底上用低饱和的色相区分
   static Color forNodeType(String type) {
     switch (type) {
       case 'say':
-        return const Color(0xFFE8E8E8); // 最亮：主线最重
+        return const Color(0xFF3C6E8F);
       case 'choice':
-        return const Color(0xFFC4C4C4);
+        return const Color(0xFF7A5AA8);
       case 'branch':
-        return const Color(0xFFA0A0A0);
+        return const Color(0xFFB07D2B);
       case 'set':
-        return const Color(0xFF8A8A8A);
+        return const Color(0xFF2F8F5B);
       case 'call':
-        return const Color(0xFF7A7A7A);
+        return const Color(0xFF35707D);
       case 'jump':
       case 'return':
-        return const Color(0xFF5A5A5A);
+        return const Color(0xFF8A8F98);
       case 'end':
-        return const Color(0xFFFFFFFF);
+        return const Color(0xFFA8443C);
       case 'script':
-        return GColors.accent; // 唯一的红：外来代码一眼可见
+        return const Color(0xFFD4763A);
       case 'character':
-        return const Color(0xFFB8C4D4);
+        return const Color(0xFF4A6FA5);
       case 'portrait':
-        return const Color(0xFF9AA6B8);
+        return const Color(0xFF7E6BA8);
       case 'background':
-        return const Color(0xFF7D8A9C);
+        return const Color(0xFF3E8E7E);
       case 'marker':
-        return const Color(0xFFD6C48A);
+        return const Color(0xFFB08A2E);
       case 'label':
-        return const Color(0xFFE8E8E8);
+        return const Color(0xFF3A3F47);
+      case 'weight':
+        return const Color(0xFF2F8F5B);
+      case 'weighted':
+        return const Color(0xFF9A5B8F);
       default:
-        return const Color(0xFF8A8A8A);
+        return const Color(0xFF8A8F98);
     }
   }
 
-  /// 卡片左上角的英文类型标签（瑞士风格：信息用排版表达）
   static String typeCode(String type) {
     switch (type) {
       case 'say':
@@ -99,6 +102,10 @@ class GColors {
         return 'TAG';
       case 'label':
         return 'NAME';
+      case 'weight':
+        return 'WEIGHT';
+      case 'weighted':
+        return 'DICE';
       default:
         return type.toUpperCase();
     }
@@ -133,8 +140,11 @@ class GType {
   static const double wideEm = 0.14;
 }
 
-/// 全局圆角：0（唯一例外是圆形状态点）
+/// 圆角（参考图是 8~14 的大圆角）
 class GRadius {
+  static const sm = BorderRadius.all(Radius.circular(6));
+  static const md = BorderRadius.all(Radius.circular(10));
+  static const lg = BorderRadius.all(Radius.circular(14));
   static const zero = BorderRadius.zero;
   static const all0 = Radius.zero;
 }
@@ -174,10 +184,10 @@ TextStyle monoStyle({Color? color, double? size}) {
 }
 
 ThemeData buildGalateaTheme(Brightness brightness) {
-  final base = ThemeData.dark(useMaterial3: true);
+  final base = ThemeData.light(useMaterial3: true);
   return base.copyWith(
-    scaffoldBackgroundColor: GColors.ink,
-    canvasColor: GColors.ink,
+    scaffoldBackgroundColor: GColors.bg,
+    canvasColor: GColors.bg,
     splashFactory: NoSplash.splashFactory,
     highlightColor: Colors.transparent,
     colorScheme: base.colorScheme.copyWith(
@@ -189,7 +199,7 @@ ThemeData buildGalateaTheme(Brightness brightness) {
       onSurface: GColors.text,
     ),
     appBarTheme: const AppBarTheme(
-      backgroundColor: GColors.ink,
+      backgroundColor: GColors.paper,
       surfaceTintColor: Colors.transparent,
       scrolledUnderElevation: 0,
       centerTitle: false,
@@ -227,15 +237,15 @@ ThemeData buildGalateaTheme(Brightness brightness) {
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       border: const OutlineInputBorder(
-        borderRadius: GRadius.zero,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
         borderSide: BorderSide(color: GColors.line, width: 1),
       ),
       enabledBorder: const OutlineInputBorder(
-        borderRadius: GRadius.zero,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
         borderSide: BorderSide(color: GColors.line, width: 1),
       ),
       focusedBorder: const OutlineInputBorder(
-        borderRadius: GRadius.zero,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
         borderSide: BorderSide(color: GColors.accent, width: 1),
       ),
       labelStyle: labelStyle(),
@@ -245,7 +255,7 @@ ThemeData buildGalateaTheme(Brightness brightness) {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: GColors.text,
-        shape: const RoundedRectangleBorder(borderRadius: GRadius.zero),
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         textStyle: const TextStyle(fontSize: GType.caption, fontWeight: FontWeight.w600),
       ),
@@ -254,7 +264,7 @@ ThemeData buildGalateaTheme(Brightness brightness) {
       style: OutlinedButton.styleFrom(
         foregroundColor: GColors.text,
         side: const BorderSide(color: GColors.line),
-        shape: const RoundedRectangleBorder(borderRadius: GRadius.zero),
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       ),
     ),
@@ -262,7 +272,7 @@ ThemeData buildGalateaTheme(Brightness brightness) {
       style: FilledButton.styleFrom(
         backgroundColor: GColors.accent,
         foregroundColor: GColors.paper,
-        shape: const RoundedRectangleBorder(borderRadius: GRadius.zero),
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         textStyle: const TextStyle(fontSize: GType.caption, fontWeight: FontWeight.w600),
       ),
@@ -271,7 +281,7 @@ ThemeData buildGalateaTheme(Brightness brightness) {
       backgroundColor: GColors.panel,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: GRadius.zero,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
         side: BorderSide(color: GColors.line),
       ),
     ),
@@ -285,7 +295,7 @@ ThemeData buildGalateaTheme(Brightness brightness) {
       contentTextStyle: const TextStyle(color: GColors.ink, fontSize: GType.caption),
       behavior: SnackBarBehavior.floating,
       shape: const RoundedRectangleBorder(
-        borderRadius: GRadius.zero,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
         side: BorderSide(color: GColors.lineLight),
       ),
     ),

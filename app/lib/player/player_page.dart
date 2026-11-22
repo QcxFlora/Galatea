@@ -354,7 +354,7 @@ class _PlayerPageState extends State<PlayerPage> {
         width: 150,
         height: 320,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.zero,
+          borderRadius: const BorderRadius.all(Radius.circular(10)),
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -546,7 +546,7 @@ class _PlayerPageState extends State<PlayerPage> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: const Color(0xEE0D1119),
-        borderRadius: BorderRadius.zero,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
         border: Border.all(color: GColors.err.withOpacity(0.6)),
       ),
       child: Column(
