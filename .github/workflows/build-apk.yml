@@ -37,6 +37,20 @@ jobs:
           grep -m1 '^version' Cargo.toml
           grep -m1 '^version:' app/pubspec.yaml
 
+      - name: Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: 编译 3D 原生库（arm64）
+        run: |
+          curl -sSL https://github.com/bbqsrc/cargo-ndk/releases/latest/download/cargo-ndk-linux.zip -o /tmp/cargo-ndk.zip
+          unzip -qo /tmp/cargo-ndk.zip -d "$HOME/.cargo/bin" || cargo install cargo-ndk --quiet
+          chmod +x "$HOME/.cargo/bin/cargo-ndk" || true
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo ndk -t arm64-v8a -o out/jniLibs build --release -p galatea-3d
+          ls -lh out/jniLibs/arm64-v8a/ || true
+
       - name: 依赖
         working-directory: app
         run: flutter pub get
@@ -54,6 +68,16 @@ jobs:
 
       - name: Android 工程改造（包名 / 固定签名 / 应用名）
         run: python3 scripts/android_setup.py app
+
+      - name: 放入 3D 原生库
+        run: |
+          set -e
+          if [ -d out/jniLibs/arm64-v8a ]; then
+            mkdir -p app/android/app/src/main/jniLibs
+            cp -rv out/jniLibs/arm64-v8a app/android/app/src/main/jniLibs/
+          else
+            echo "::warning::没有编出 libgalatea_3d.so，3D 预览会显示占位"
+          fi
 
       - name: 应用图标
         working-directory: app

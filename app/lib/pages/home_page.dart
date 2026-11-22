@@ -9,11 +9,11 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import '../engine/game_launcher.dart';
 import '../engine/spring.dart';
 import '../editor/editor_page.dart';
 import '../platform/orientation.dart';
 import '../storage/store.dart';
+import 'scene3d_page.dart';
 import '../theme.dart';
 import '../ui/depth.dart';
 import '../version.dart';
@@ -88,15 +88,10 @@ class _HomePageState extends State<HomePage> {
     await _open(p);
   }
 
-  /// 把最近一本书交给 Godot 运行时（3D 演出）
+  /// 打开 3D 预览（验证「Flutter 独占显示 + Rust 渲染」链路）
   Future<void> _play3d() async {
-    final books = await ProjectStore.listGal();
-    if (books.isEmpty) {
-      _toast('书柜还是空的，先放一本书进来');
-      return;
-    }
-    final msg = await launchWithProject(books.first.path);
-    _toast(msg);
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const Scene3DPage()));
   }
 
   Future<void> _openSample() async {
