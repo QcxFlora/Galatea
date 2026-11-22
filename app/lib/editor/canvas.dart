@@ -242,7 +242,10 @@ class _GraphCanvasState extends State<GraphCanvas> {
               Positioned(
                 left: n.x * _scale + _pan.dx,
                 top: n.y * _scale + _pan.dy,
-                child: Transform.scale(
+                child: Transform.translate(
+                  // 选中时轻微离地，视觉上"z 更高"
+                  offset: Offset(0, widget.selectedId == n.id ? -4 : 0),
+                  child: Transform.scale(
                   scale: _scale,
                   alignment: Alignment.topLeft,
                   child: _NodeCard(
@@ -279,6 +282,7 @@ class _GraphCanvasState extends State<GraphCanvas> {
                     onPortEnd: _endLink,
                     onPortTap: (port) => _tapPort(n, port),
                   ),
+                  ),
                 ),
               ),
             Positioned(
@@ -291,6 +295,24 @@ class _GraphCanvasState extends State<GraphCanvas> {
                   _pan = const Offset(80, 60);
                 }),
                 onFit: _fitAll,
+              ),
+            ),
+            // 画布边缘渐暗：把视线往中间收，像舞台打光
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: Alignment.center,
+                      radius: 1.05,
+                      colors: [
+                        Colors.transparent,
+                        const Color(0xFF0E1117).withOpacity(0.55),
+                      ],
+                      stops: const [0.62, 1.0],
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -388,6 +410,20 @@ class _NodeCard extends StatelessWidget {
                   color: (selected || playing) ? GColors.accent : GColors.line,
                   width: (selected || playing) ? 2 : 1,
                 ),
+                // 3D 分层：选中的卡片"浮"起来（阴影更大更散）
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(selected ? 0.16 : 0.05),
+                    blurRadius: selected ? 24 : 10,
+                    offset: Offset(0, selected ? 12 : 4),
+                  ),
+                  if (selected)
+                    BoxShadow(
+                      color: GColors.accent.withOpacity(0.10),
+                      blurRadius: 18,
+                      spreadRadius: 1,
+                    ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -546,16 +582,31 @@ class _GridPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final step = 40 * scale;
     if (step < 8) return;
+    // 背景视差：网格跟著画布走，但只走 0.82 —— 看起来比节点远
+    const parallax = 0.82;
     final paint = Paint()
       ..color = const Color(0xFF1A2130)
       ..strokeWidth = 1;
-    final startX = pan.dx % step;
-    final startY = pan.dy % step;
+    final startX = (pan.dx * parallax) % step;
+    final startY = (pan.dy * parallax) % step;
     for (var x = startX; x < size.width; x += step) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
     for (var y = startY; y < size.height; y += step) {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+    // 更淡的第二层网格（更远），用 0.6 的视差
+    final far = Paint()
+      ..color = const Color(0xFF141A26)
+      ..strokeWidth = 1;
+    final step2 = step * 4;
+    final fx = (pan.dx * 0.6) % step2;
+    final fy = (pan.dy * 0.6) % step2;
+    for (var x = fx; x < size.width; x += step2) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), far);
+    }
+    for (var y = fy; y < size.height; y += step2) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), far);
     }
   }
 
@@ -622,6 +673,19 @@ class _EdgePainter extends CustomPainter {
   }
 
   void _edge(Canvas canvas, Offset from, Offset to, Color color, bool active) {
+    // 3D 分层：选中节点的连线"更近"——先铺一层宽而淡的光晕
+    if (active) {
+      final glow = Paint()
+        ..color = color.withOpacity(0.18)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 9.0
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+      final gp = Path()..moveTo(from.dx, from.dy);
+      final gdx = ((to.dx - from.dx).abs()).clamp(48.0, 200.0);
+      gp.cubicTo(from.dx + gdx, from.dy, to.dx - gdx, to.dy, to.dx, to.dy);
+      canvas.drawPath(gp, glow);
+    }
     final paint = Paint()
       ..color = color.withOpacity(active ? 1.0 : 0.55)
       ..style = PaintingStyle.stroke
