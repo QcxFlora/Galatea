@@ -14,6 +14,7 @@ import '../editor/editor_page.dart';
 import '../platform/orientation.dart';
 import '../storage/store.dart';
 import '../theme.dart';
+import '../ui/depth.dart';
 import '../version.dart';
 
 class HomePage extends StatefulWidget {
@@ -144,9 +145,18 @@ class _HomePageState extends State<HomePage> {
     final bottom = MediaQuery.of(context).viewPadding.bottom;
     return Scaffold(
       backgroundColor: GColors.bg,
-      body: Stack(
+      body: DepthScene(
+        maxTilt: 3.5,
+        child: Stack(
         children: [
-          const Positioned.fill(child: _PaperBackground()),
+          // 远景层：退后一层，带漂浮轨道
+          const Positioned.fill(
+            child: DepthBackdrop(
+              depth: 1.0,
+              child: _PaperBackground(),
+            ),
+          ),
+          const Positioned.fill(child: DepthRails(depth: 0.7)),
           SafeArea(
             bottom: false,
             child: Column(
@@ -210,6 +220,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -354,16 +365,14 @@ class _RecordCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
-      child: Container(
+      child: DepthCard(
+        elevation: 10,
+        child: Container(
         height: 148,
         decoration: BoxDecoration(
           color: GColors.paper,
           borderRadius: const BorderRadius.all(Radius.circular(14)),
           border: Border.all(color: GColors.lineLight),
-          boxShadow: const [
-            BoxShadow(
-                color: Color(0x0D000000), blurRadius: 16, offset: Offset(0, 4)),
-          ],
         ),
         clipBehavior: Clip.antiAlias,
         child: Row(
@@ -476,6 +485,7 @@ class _RecordCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }
