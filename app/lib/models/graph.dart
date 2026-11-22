@@ -770,8 +770,9 @@ class Story {
 
   /// 思维导图式自动布局：从入口往下长，兄弟横向排开，孤岛扔到一边。
   void autoLayout() {
-    const colWidth = 300.0;
-    const rowHeight = 190.0;
+    // 竖屏屏幕窄：分支横向收紧，纵向照旧
+    const colWidth = 220.0;
+    const rowHeight = 180.0;
     final depth = <String, int>{};
     final byDepth = <int, List<String>>{};
 

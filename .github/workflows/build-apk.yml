@@ -40,6 +40,30 @@ jobs:
           # 允许明文 HTTP（本地资源）并确认签名配置走 debug key（可直接安装）
           ls android/app/src/main/AndroidManifest.xml
 
+      - name: 应用图标与应用名
+        working-directory: app
+        run: |
+          set -e
+          # 尺寸映射
+          for d in android/app/src/main/res/mipmap-*; do
+            [ -d "$d" ] || continue
+            case "$d" in
+              *mdpi*)   s=48 ;;
+              *hdpi*)   s=72 ;;
+              *xhdpi*)  s=96 ;;
+              *xxhdpi*) s=144 ;;
+              *)        s=192 ;;
+            esac
+            cp "icon/ic_launcher_$s.png" "$d/ic_launcher.png"
+          done
+          # 去掉 adaptive icon 的 xml（否则系统优先用它，png 不生效）
+          rm -rf android/app/src/main/res/mipmap-anydpi-v26
+          # 应用名
+          MAN=android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:label="[^"]*"/android:label="Galatea"/' "$MAN"
+          grep -o 'android:label="[^"]*"' "$MAN" | head -1
+          ls -l android/app/src/main/res/mipmap-xxxhdpi/ | head -4
+
       - name: 构建 release APK
         working-directory: app
         run: flutter build apk --release --no-tree-shake-icons

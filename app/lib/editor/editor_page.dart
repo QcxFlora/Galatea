@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import '../engine/lint.dart';
 import '../models/graph.dart';
 import '../player/player_page.dart';
+import '../platform/orientation.dart';
 import '../storage/store.dart';
 import '../theme.dart';
 import 'canvas.dart';
@@ -38,6 +39,7 @@ class _EditorPageState extends State<EditorPage> {
   @override
   void initState() {
     super.initState();
+    lockPortrait();
     story = widget.story;
     _relint();
   }
@@ -308,7 +310,7 @@ class _EditorPageState extends State<EditorPage> {
           _issueBar(errors, warnings, infos),
           if (selected != null && story.nodeById(selected) != null)
             SizedBox(
-              height: 300,
+              height: MediaQuery.of(context).size.height * 0.38,
               child: Inspector(
                 story: story,
                 nodeId: selected!,

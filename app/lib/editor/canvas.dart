@@ -88,7 +88,16 @@ class GraphCanvas extends StatefulWidget {
 class _GraphCanvasState extends State<GraphCanvas> {
   final GlobalKey _boxKey = GlobalKey();
   Offset _pan = const Offset(80, 60);
-  double _scale = 0.72;
+  double _scale = 0.62; // 竖屏偏小；首帧会自动全览
+
+  @override
+  void initState() {
+    super.initState();
+    // 竖屏屏幕小，打开编辑器先自动全览一次
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _fitAll();
+    });
+  }
 
   Offset _panStart = Offset.zero;
   double _scaleStart = 1;
@@ -273,7 +282,7 @@ class _GraphCanvasState extends State<GraphCanvas> {
               child: _ZoomBadge(
                 scale: _scale,
                 onReset: () => setState(() {
-                  _scale = 0.72;
+                  _scale = 0.62;
                   _pan = const Offset(80, 60);
                 }),
                 onFit: _fitAll,

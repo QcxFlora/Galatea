@@ -2,16 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'pages/home_page.dart';
+import 'platform/orientation.dart';
 import 'theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 画布工具只做横屏（竖屏没有意义）
-  await SystemChrome.setPreferredOrientations(const [
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-  ]);
+  // 方向策略：竖屏设计 / 横屏游玩（各页面自己声明）
+  await lockPortrait();
 
   // 3 按钮导航 / 手势导航都走 edge-to-edge，底部避让交给 viewPadding
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);

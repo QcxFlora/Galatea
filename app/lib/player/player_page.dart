@@ -9,6 +9,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../engine/spring.dart';
+import '../platform/orientation.dart';
 import '../engine/vm.dart';
 import '../models/graph.dart';
 import '../storage/store.dart';
@@ -34,6 +35,8 @@ class _PlayerPageState extends State<PlayerPage> {
   @override
   void initState() {
     super.initState();
+    // 游玩态：横屏
+    lockLandscape();
     vm = Vm(widget.story);
     _advance();
   }
@@ -42,6 +45,8 @@ class _PlayerPageState extends State<PlayerPage> {
   void dispose() {
     _typer?.cancel();
     _autoTimer?.cancel();
+    // 交还设计态：竖屏
+    lockPortrait();
     super.dispose();
   }
 
@@ -297,13 +302,18 @@ class _PlayerPageState extends State<PlayerPage> {
                         0,
                         16,
                         14 + MediaQuery.of(context).viewPadding.bottom),
-                    child: choices != null
-                        ? _choiceList(choices)
-                        : (ending != null
-                            ? _endingCard(ending)
-                            : (halt != null
-                                ? _haltCard(halt)
-                                : _dialogue(say))),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 720),
+                        child: choices != null
+                            ? _choiceList(choices)
+                            : (ending != null
+                                ? _endingCard(ending)
+                                : (halt != null
+                                    ? _haltCard(halt)
+                                    : _dialogue(say))),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -368,7 +378,7 @@ class _PlayerPageState extends State<PlayerPage> {
       onTap: _tapText,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 132),
+        constraints: const BoxConstraints(minHeight: 116),
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
         decoration: const BoxDecoration(
           color: Color(0xF20A0A0A),

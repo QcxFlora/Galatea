@@ -9,6 +9,7 @@ import 'package:flutter/services.dart' show rootBundle;
 
 import '../editor/editor_page.dart';
 import '../engine/spring.dart';
+import '../platform/orientation.dart';
 import '../models/graph.dart';
 import '../storage/store.dart';
 import '../theme.dart';
@@ -27,6 +28,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    lockPortrait();
     _refresh();
   }
 
