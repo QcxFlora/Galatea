@@ -20,3 +20,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/samples/rain.gala.json
+    - assets/samples/arknights_demo.json
+    - assets/characters/

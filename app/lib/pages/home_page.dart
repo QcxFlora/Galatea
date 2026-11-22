@@ -81,18 +81,24 @@ class _HomePageState extends State<HomePage> {
     await _openEditor(story, file: f);
   }
 
-  Future<void> _openDemo() async {
+  Future<void> _openSample(String asset, String fileName) async {
     try {
-      final raw = await rootBundle.loadString('assets/samples/rain.gala.json');
+      final raw = await rootBundle.loadString(asset);
       final decoded = jsonDecode(raw);
       if (decoded is! Map) throw const FormatException('示例文件损坏');
       final story = Story.fromJson(Map<String, dynamic>.from(decoded));
-      final f = await ProjectStore.save(story, fileName: '示例-雨声与自动门.gala.json');
+      final f = await ProjectStore.save(story, fileName: fileName);
       await _openEditor(story, file: f);
     } catch (e) {
       _toast('打开示例失败：$e');
     }
   }
+
+  Future<void> _openDemo() =>
+      _openSample('assets/samples/rain.gala.json', '示例-雨声与自动门.gala.json');
+
+  Future<void> _openArknights() =>
+      _openSample('assets/samples/arknights_demo.json', '示例-博士的加班报告.gala.json');
 
   Future<void> _import() async {
     final controller = TextEditingController();
@@ -186,10 +192,18 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 30),
                 _EntryCard(
                   icon: '✦',
-                  color: GColors.accent2,
-                  title: '试玩示例',
-                  subtitle: '《雨声与自动门》· 20 节点 · 3 结局',
+                  color: GColors.accent,
+                  title: '《博士的加班报告》',
+                  subtitle: '明日方舟同人 · 24 方块 · 3 结局 · 演示角色与立绘方块',
                   highlight: true,
+                  onTap: _openArknights,
+                ),
+                const SizedBox(height: 12),
+                _EntryCard(
+                  icon: '✦',
+                  color: GColors.accent2,
+                  title: '《雨声与自动门》',
+                  subtitle: '原创短篇 · 20 节点 · 3 结局',
                   onTap: _openDemo,
                 ),
                 const SizedBox(height: 12),

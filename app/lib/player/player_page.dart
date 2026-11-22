@@ -219,8 +219,8 @@ class _PlayerPageState extends State<PlayerPage> {
           Positioned.fill(child: _background(say)),
           if (say?.portrait != null)
             Positioned(
-              right: 20,
-              bottom: 190,
+              right: 24,
+              bottom: MediaQuery.of(context).size.height * 0.26,
               child: _portrait(say!.portrait!),
             ),
           Positioned(
@@ -346,9 +346,10 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Widget _portrait(String path) {
+    final h = MediaQuery.of(context).size.height * 0.62;
     return Image.asset(
       path,
-      height: 320,
+      height: h,
       errorBuilder: (_, __, ___) => Container(
         width: 150,
         height: 320,
