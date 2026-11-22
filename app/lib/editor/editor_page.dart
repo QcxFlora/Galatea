@@ -19,10 +19,9 @@ import 'inspector.dart';
 import 'meta_sheets.dart';
 
 class EditorPage extends StatefulWidget {
-  final Story story;
-  final File? file;
+  final LoadedProject project;
 
-  const EditorPage({super.key, required this.story, this.file});
+  const EditorPage({super.key, required this.project});
 
   @override
   State<EditorPage> createState() => _EditorPageState();
@@ -40,7 +39,7 @@ class _EditorPageState extends State<EditorPage> {
   void initState() {
     super.initState();
     lockPortrait();
-    story = widget.story;
+    story = widget.project.story;
     _relint();
   }
 
@@ -71,8 +70,8 @@ class _EditorPageState extends State<EditorPage> {
     if (!mounted) return;
     setState(() => _saving = true);
     try {
-      await ProjectStore.save(story,
-          fileName: widget.file?.uri.pathSegments.last);
+      // 剧本对象是共享的，直接重新打包回 .gal
+      await ProjectStore.save(widget.project);
       if (!mounted) return;
       setState(() {
         _dirty = false;
@@ -273,11 +272,8 @@ class _EditorPageState extends State<EditorPage> {
                 case 'vars':
                   _showVars();
                   break;
-                case 'export':
-                  _export();
-                  break;
-                case 'import':
-                  _import();
+                case 'about':
+                  _showGalInfo();
                   break;
                 case 'meta':
                   _showMeta();
@@ -290,8 +286,7 @@ class _EditorPageState extends State<EditorPage> {
               PopupMenuItem(value: 'vars', child: Text('变量管理')),
               PopupMenuItem(value: 'meta', child: Text('作品信息')),
               PopupMenuDivider(),
-              PopupMenuItem(value: 'export', child: Text('导出 JSON')),
-              PopupMenuItem(value: 'import', child: Text('从 JSON 覆盖导入')),
+              PopupMenuItem(value: 'about', child: Text('.gal 作品包信息')),
             ],
           ),
         ],
@@ -547,100 +542,42 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
-  void _export() {
-    final text = story.toPrettyJson();
+  void _showGalInfo() {
+    final p = widget.project;
+    final file = p.file;
+    final size = file.existsSync() ? file.lengthSync() : 0;
+    final kb = (size / 1024).toStringAsFixed(1);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: GColors.panel,
-        title: const Text('导出剧本'),
-        content: SizedBox(
-          width: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('这就是 .gala.json，Rust 打包器和播放器读的都是它。',
-                  style: TextStyle(fontSize: 12, color: GColors.dim)),
-              const SizedBox(height: 8),
-              Flexible(
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: GColors.bg,
-                    borderRadius: BorderRadius.zero,
-                  ),
-                  child: SingleChildScrollView(
-                    child: SelectableText(
-                      text,
-                      style: const TextStyle(
-                          fontSize: 10.5,
-                          fontFamily: 'monospace',
-                          color: GColors.text),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        title: const Text('.gal 作品包'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(file.uri.pathSegments.last,
+                style: const TextStyle(fontSize: 13)),
+            const SizedBox(height: 10),
+            Text('大小 $kb KB · 资源 ${p.assetCount} 个',
+                style: const TextStyle(fontSize: 11.5, color: GColors.dim)),
+            const SizedBox(height: 6),
+            Text('节点 ${story.nodes.length} · 分组 ${story.groups.length}',
+                style: const TextStyle(fontSize: 11.5, color: GColors.dim)),
+            const SizedBox(height: 12),
+            const Text('剧本以字符串池化 + DEFLATE 存在包里，\n外界看到的就是这一个文件。',
+                style: TextStyle(fontSize: 11, color: GColors.dim, height: 1.6)),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: text));
-              if (ctx.mounted) Navigator.pop(ctx);
-              _toast('已复制到剪贴板');
-            },
-            child: const Text('复制全部'),
-          ),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('关闭')),
+              onPressed: () => Navigator.pop(ctx), child: const Text('好')),
         ],
       ),
     );
   }
 
-  void _import() {
-    final controller = TextEditingController();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: GColors.panel,
-        title: const Text('从 JSON 导入'),
-        content: SizedBox(
-          width: 420,
-          child: TextField(
-            controller: controller,
-            maxLines: 10,
-            style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-            decoration: const InputDecoration(
-                hintText: '把 .gala.json 的内容粘进来（会覆盖当前作品）'),
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          TextButton(
-            onPressed: () {
-              try {
-                final raw = jsonDecode(controller.text);
-                if (raw is! Map) throw const FormatException('不是 JSON 对象');
-                final decoded = Story.fromJson(Map<String, dynamic>.from(raw));
-                story = decoded;
-                selected = null;
-                Navigator.pop(ctx);
-                _changed();
-                _toast('导入成功');
-              } catch (e) {
-                _toast('导入失败：$e');
-              }
-            },
-            child: const Text('导入'),
-          ),
-        ],
-      ),
-    );
-  }
+
 }
 
 class _ToolChip extends StatelessWidget {

@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   path_provider: ^2.1.4
+  file_picker: ^8.1.6
 
 dev_dependencies:
   flutter_test:
@@ -19,6 +20,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/samples/rain.gala.json
-    - assets/samples/arknights_demo.json
+    - assets/samples/
     - assets/characters/

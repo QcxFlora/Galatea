@@ -253,12 +253,30 @@ class Vm {
       switch (node.type) {
         case NodeType.say:
           _pushSnapshot();
-          final info = _speakerInfo(node.speaker, node.portrait);
+          // art 端口 → 立绘方块里的真实资源路径
+          String? artPath;
+          if (node.art != null && node.art!.isNotEmpty) {
+            final an = story.nodeById(node.art);
+            if (an != null && an.type == NodeType.portrait) artPath = an.asset;
+          }
+          // cast 端口 → 标记名方块 / 角色方块的 key
+          String? castKey;
+          if (node.cast != null && node.cast!.isNotEmpty) {
+            final cn = story.nodeById(node.cast);
+            if (cn != null) {
+              if (cn.type == NodeType.marker) castKey = cn.tag;
+              if (cn.type == NodeType.character) castKey = cn.tag;
+            }
+          }
+          final who = (node.speaker != null && node.speaker!.isNotEmpty)
+              ? node.speaker
+              : castKey;
+          final info = _speakerInfo(who, artPath ?? node.portrait);
           log.add(info.name.isEmpty ? node.text : '${info.name}：${node.text}');
           pc = node.next;
           return SayEvent(
             node: id,
-            speaker: node.speaker,
+            speaker: who,
             speakerName: info.name,
             color: info.color,
             text: node.text,
@@ -329,6 +347,28 @@ class Vm {
 
   _SpeakerInfo _speakerInfo(String? key, String? portrait) {
     if (key == null || key.isEmpty) return _SpeakerInfo('', null, null);
+
+    // 1. 标记名方块 → 顺着 next 找「显示名」方块
+    for (final n in story.nodes) {
+      if (n.type == NodeType.marker && (n.tag == key || n.id == key)) {
+        final labelNode = story.nodeById(n.next);
+        if (labelNode != null && labelNode.type == NodeType.label) {
+          return _SpeakerInfo(labelNode.text, null, portrait);
+        }
+        return _SpeakerInfo(n.tag ?? key, null, portrait);
+      }
+    }
+    // 2. 角色方块（v0.2）
+    for (final n in story.nodes) {
+      if (n.type == NodeType.character && (n.tag == key || n.id == key)) {
+        return _SpeakerInfo(
+          n.text.isEmpty ? (n.tag ?? key) : n.text,
+          null,
+          portrait ?? (n.portraits.isNotEmpty ? n.portraits.first : null),
+        );
+      }
+    }
+    // 3. 传统 characters 表
     final c = story.characters[key];
     if (c == null) return _SpeakerInfo(key, null, portrait);
     return _SpeakerInfo(

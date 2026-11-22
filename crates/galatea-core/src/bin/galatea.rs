@@ -496,18 +496,16 @@ fn cmd_pack(story_path: &str, args: &[String]) -> Result<(), String> {
         .map_err(|e| format!("读不到 {}：{}", story_path, e))?;
     let dir = path.parent().unwrap_or_else(|| std::path::Path::new("."));
 
-    // 剧本有两条编码路线：原始 JSON / 字符串池化后再压。
-    // DEFLATE 的 LZ77 本身就会做重复串引用，预池化有时反而变大，
-    // 所以这里真的两种都压一遍，取更小的那个。
-    let pooled = galatea_core::compact::pack_str(&json).unwrap_or_else(|_| json.clone());
-    let raw_cost = gal::deflate_len(json.as_bytes());
-    let pool_cost = gal::deflate_len(pooled.as_bytes());
-    let (chosen, route) = if pool_cost < raw_cost {
-        (pooled, "池化")
-    } else {
-        (json.clone(), "原样")
-    };
-    println!("   剧本编码：{}（原样 {}B / 池化 {}B → 选 {}）", route, raw_cost, pool_cost, raw_cost.min(pool_cost));
+    // 剧本统一走「字符串池化」编码：重复的说话人 / 资源路径 / 字段值
+    // 只存进池子一次，其余位置写 {"$s":索引} 引用。
+    // 这是 .gal 唯一的剧本编码，不再保留「原始 JSON」分支。
+    let pooled = galatea_core::compact::pack_str(&json)?;
+    println!(
+        "   剧本编码：池化 {}B → 压缩后 {}B",
+        pooled.len(),
+        gal::deflate_len(pooled.as_bytes())
+    );
+    let chosen = pooled;
 
     let mut files: BTreeMap<String, Vec<u8>> = BTreeMap::new();
     files.insert("story.gala.json".to_string(), chosen.into_bytes());

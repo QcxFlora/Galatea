@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+"""把 `flutter create` 生成的 Android 工程改造成 Galatea 的样子。
+
+CI 里在 `flutter create` 之后、`flutter build` 之前跑：
+
+    python3 scripts/android_setup.py app
+
+做四件事：
+1. 包名改成 `com.galatea.studio`（applicationId / namespace）
+2. MainActivity 挪到对应包路径并改 package 声明
+3. 注入 release 签名配置（读 android/key.properties）
+4. 用仓库里的 signing/release.jks 签名（固定指纹，升级 APK 不用卸载）
+
+不用 GitHub Secrets：密钥就在仓库里。这是开源项目换取
+「任何人 clone 下来都能签出同一指纹」的取舍，别拿它上架应用商店。
+"""
+import os
+import re
+import shutil
+import sys
+from pathlib import Path
+
+APP_ID = "com.galatea.studio"
+PKG_PATH = APP_ID.replace(".", "/")
+
+
+def main(app_dir: str) -> int:
+    app = Path(app_dir)
+    android = app / "android"
+    if not android.is_dir():
+        print(f"!! {android} 不存在，先跑 flutter create", file=sys.stderr)
+        return 1
+
+    # ── 1. build.gradle(.kts)
+    gradle_kts = android / "app" / "build.gradle.kts"
+    gradle_groovy = android / "app" / "build.gradle"
+    if gradle_kts.exists():
+        s = gradle_kts.read_text(encoding="utf-8")
+        s = re.sub(r'namespace\s*=\s*"[^"]*"', f'namespace = "{APP_ID}"', s)
+        s = re.sub(r'applicationId\s*=\s*"[^"]*"', f'applicationId = "{APP_ID}"', s)
+
+        signing = '''
+    signingConfigs {
+        create("release") {
+            val propsFile = rootProject.file("key.properties")
+            if (propsFile.exists()) {
+                val props = java.util.Properties()
+                propsFile.inputStream().use { props.load(it) }
+                storeFile = file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
+    }
+'''
+        if "signingConfigs" not in s:
+            # 插到 android { ... } 的最后（buildTypes 之前）
+            s = s.replace("    buildTypes {", signing + "\n    buildTypes {", 1)
+        # 用 release 签名替换模板里的 debug 签名
+        s = re.sub(r'signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)',
+                   'signingConfig = signingConfigs.getByName("release")', s)
+        gradle_kts.write_text(s, encoding="utf-8")
+        print("✓ build.gradle.kts：包名 + release 签名")
+    elif gradle_groovy.exists():
+        s = gradle_groovy.read_text(encoding="utf-8")
+        s = re.sub(r'applicationId\s+"[^"]*"', f'applicationId "{APP_ID}"', s)
+        s = re.sub(r'namespace\s+"[^"]*"', f'namespace "{APP_ID}"', s)
+        if "signingConfigs" not in s:
+            s = s.replace("    buildTypes {", '''    signingConfigs {
+        release {
+            def propsFile = rootProject.file('key.properties')
+            if (propsFile.exists()) {
+                def props = new Properties()
+                propsFile.withInputStream { props.load(it) }
+                storeFile file(props['storeFile'])
+                storePassword props['storePassword']
+                keyAlias props['keyAlias']
+                keyPassword props['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {''', 1)
+        s = s.replace("signingConfig signingConfigs.debug", "signingConfig signingConfigs.release")
+        gradle_groovy.write_text(s, encoding="utf-8")
+        print("✓ build.gradle：包名 + release 签名")
+    else:
+        print("!! 找不到 build.gradle(.kts)", file=sys.stderr)
+        return 1
+
+    # ── 2. MainActivity 搬家
+    src_root = android / "app" / "src" / "main" / "kotlin"
+    if not src_root.is_dir():
+        src_root = android / "app" / "src" / "main" / "java"
+    moved = 0
+    if src_root.is_dir():
+        for f in list(src_root.rglob("MainActivity.kt")):
+            old_pkg_dir = f.parent
+            text = f.read_text(encoding="utf-8")
+            text = re.sub(r"^package\s+\S+", f"package {APP_ID}", text, flags=re.M)
+            new_dir = src_root / PKG_PATH
+            new_dir.mkdir(parents=True, exist_ok=True)
+            (new_dir / "MainActivity.kt").write_text(text, encoding="utf-8")
+            if old_pkg_dir != new_dir:
+                shutil.rmtree(old_pkg_dir, ignore_errors=True)
+            moved += 1
+            print(f"✓ MainActivity → {PKG_PATH}/MainActivity.kt")
+    if moved == 0:
+        print("!! 没找到 MainActivity.kt（模板可能变了）", file=sys.stderr)
+
+    # ── 3. key.properties
+    key_props = android / "key.properties"
+    repo_root = app.parent
+    jks = repo_root / "signing" / "release.jks"
+    if not jks.exists():
+        print(f"!! 找不到 {jks}", file=sys.stderr)
+        return 1
+    key_props.write_text(
+        f"storePassword=galatea2026\n"
+        f"keyPassword=galatea2026\n"
+        f"keyAlias=galatea\n"
+        f"storeFile={jks.resolve()}\n",
+        encoding="utf-8",
+    )
+    print(f"✓ key.properties → {key_props}")
+
+    # ── 4. 顺手把应用名改成 Galatea（若有 locale 资源也一起）
+    for manifest in android.rglob("AndroidManifest.xml"):
+        t = manifest.read_text(encoding="utf-8")
+        t2 = re.sub(r'android:label="[^"]*"', 'android:label="Galatea"', t)
+        if t2 != t:
+            manifest.write_text(t2, encoding="utf-8")
+    print("✓ 应用名 → Galatea")
+    print("\n完成。包名：", APP_ID)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else "app"))
