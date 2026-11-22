@@ -94,6 +94,12 @@ List<Issue> lintStory(Story story) {
       case NodeType.end:
         endIds.add(n.id);
         break;
+      case NodeType.script:
+        if (n.next == null || n.next!.isEmpty) {
+          out.add(Issue(IssueLevel.warning, n.id, 'dead-end',
+              '脚本执行完之后没有连线，剧情会在这里断掉'));
+        }
+        break;
       case NodeType.ret:
         break;
     }
