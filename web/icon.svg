@@ -1,32 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   Galatea 图标 · 矢量 · 瑞士国际主义风格
-  ───────────────────────────────────────
-  构成：一个根节点向右、下分出三路
-    · 实心白方块（左）  = 已完成的剧情节点
-    · 实心红方块（右）  = 脚本节点（全项目唯一彩色）
-    · 虚线 + 空心方块（下）= 尚未完成的支线
-    · 外圈 1px 轨道      = 来自星尘的星图感
-  栅格：192 × 192，所有坐标落在 8 的倍数上
+  ─────────────────────────────────────────────
+  设计由 Qwen（qwen-plus-character）生成，三轮迭代后定稿：
+    第 1 轮  十字准星，对称、没有方向感          → 否
+    第 2 轮  A2 地铁线路图式分叉 / A3 45° 叉 / D 字母 G
+             → 选 A2（只有它在 48px 下仍能读出"从根生长"）
+  语义：
+    白实心方块（左上）= 根节点 / 剧情起点
+    白主干折线      = 主线（向右再向下）
+    红方块（右）    = 脚本节点（全项目唯一彩色）
+    空心方块（下）  = 尚未写完的支线
+    极细同心圆      = 星图轨道（来自星尘）
+  定稿时的技术修正：轨道 r 78→68、线宽 6→1.5（避免与图形相交并让层次后退），
+  空心方块描边 6→4（16px 方块上 6px 描边会让内部只剩 4px）。
+  栅格：192，所有坐标落在 8 的倍数上。
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
   <rect width="192" height="192" fill="#0A0A0A"/>
 
   <!-- 星图轨道 -->
-  <circle cx="96" cy="96" r="72" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="1"/>
-  <circle cx="96" cy="96" r="56" fill="none" stroke="#FFFFFF" stroke-opacity="0.07" stroke-width="1"/>
+  <circle cx="96" cy="96" r="68" fill="none" stroke="#FFFFFF" stroke-opacity="0.09" stroke-width="1.5"/>
 
-  <!-- 连线：根 → 左 / 右 / 下 -->
-  <path d="M96 64 V96 M96 96 H64 M96 96 H128"
-        fill="none" stroke="#FFFFFF" stroke-width="3"/>
-  <path d="M96 96 V136"
-        fill="none" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="3"
-        stroke-dasharray="6 6"/>
+  <!-- 主线：根节点 → 右 → 下 -->
+  <path d="M40,40 H96 V140" fill="none" stroke="#FFFFFF" stroke-width="6"/>
+
+  <!-- 分支：脚本 -->
+  <path d="M96,76 H146" fill="none" stroke="#FFFFFF" stroke-width="6"/>
 
   <!-- 节点 -->
-  <rect x="88" y="48" width="16" height="16" fill="#FFFFFF"/>
-  <rect x="56" y="88" width="16" height="16" fill="#FFFFFF"/>
-  <rect x="120" y="88" width="16" height="16" fill="#E4032E"/>
-  <rect x="88" y="136" width="16" height="16" fill="none"
-        stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="2"/>
+  <rect x="24" y="32" width="16" height="16" fill="#FFFFFF"/>
+  <rect x="146" y="68" width="16" height="16" fill="#E4032E"/>
+  <rect x="88" y="140" width="16" height="16" fill="none" stroke="#FFFFFF" stroke-width="4"/>
 </svg>
