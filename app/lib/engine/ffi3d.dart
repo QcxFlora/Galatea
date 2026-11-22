@@ -96,46 +96,48 @@ class Gal3D {
 
   static ffi.DynamicLibrary? _lib;
 
+  /// 原生库是否就绪（**只用于 UI 上的状态标签**，不用于决定要不要渲染）
   static bool get available => _lib != null;
 
-  /// 尝试加载原生库；失败返回 null（UI 侧要能优雅退化成占位）
-  static Gal3D? create(int width, int height) {
+  /// 创建引擎。**加载失败就抛**——不允许返回 null 让调用方去画占位框。
+  static Gal3D create(int width, int height) {
     final lib = _lib ??= _open();
-    if (lib == null) return null;
     final f = lib.lookupFunction<_NewC, _NewD>('g3d_new');
     final h = f(width, height);
-    if (h == ffi.nullptr) return null;
+    if (h == ffi.nullptr) {
+      throw StateError(
+          'g3d_new($width,$height) 返回空指针：3D 后端初始化失败');
+    }
     return Gal3D._(h, width, height, lib);
   }
 
-  static ffi.DynamicLibrary? _open() {
-    const candidates = [
+  /// 按顺序找库；**全部失败时把每条失败原因拼起来抛出去**
+  static ffi.DynamicLibrary _open() {
+    final tried = <String>[];
+    final candidates = <String>[
       'libgalatea_3d.so',
       'libgalatea_3d.dylib',
       'galatea_3d.dll',
+      if (!Platform.isAndroid && !Platform.isIOS) ...const [
+        'target/debug/libgalatea_3d.so',
+        'target/release/libgalatea_3d.so',
+        '../target/release/libgalatea_3d.so',
+      ],
     ];
     for (final name in candidates) {
       try {
         return ffi.DynamicLibrary.open(name);
-      } catch (_) {
-        continue;
+      } on ArgumentError catch (e) {
+        tried.add('$name → $e');
       }
     }
-    // 桌面开发时直接指 target/debug
-    if (!Platform.isAndroid && !Platform.isIOS) {
-      for (final p in [
-        'target/debug/libgalatea_3d.so',
-        'target/release/libgalatea_3d.so',
-        '../target/release/libgalatea_3d.so',
-      ]) {
-        try {
-          return ffi.DynamicLibrary.open(p);
-        } catch (_) {
-          continue;
-        }
-      }
-    }
-    return null;
+    throw StateError(
+      '加载 galatea-3d 原生库失败。已尝试：
+${tried.join('
+')}
+'
+      '修法：cargo ndk -t arm64-v8a -o android/app/src/main/jniLibs build --release -p galatea-3d',
+    );
   }
 
   void clear() => _clear(_h);
@@ -167,18 +169,20 @@ class Gal3D {
   }
 
   /// 渲染并取回 RGBA 像素（拷贝一份，原生缓冲下次就失效）
-  Uint8List? renderRgba() {
-    if (_render(_h) == 0) return null;
+  Uint8List renderRgba() {
+    if (_render(_h) == 0) {
+      throw StateError('g3d_render 失败（引擎句柄失效？）');
+    }
     final p = _pixels(_h);
-    if (p == ffi.nullptr) return null;
+    if (p == ffi.nullptr) {
+      throw StateError('g3d_pixels 返回空指针');
+    }
     final len = width * height * 4;
     return Uint8List.fromList(p.asTypedList(len));
   }
 
   void dispose() {
-    try {
-      _lib?.lookupFunction<_Void1C, _Void1D>('g3d_free')(_h);
-    } catch (_) {}
+    _lib?.lookupFunction<_Void1C, _Void1D>('g3d_free')(_h);
   }
 
   static ffi.Pointer<ffi.Uint8> _alloc(String s) {
@@ -225,13 +229,10 @@ class _Scene3DViewState extends State<Scene3DView>
   @override
   void initState() {
     super.initState();
+    // 这里不兜底：库没编出来就让这页直接炸，炸得越早越好
     _engine = Gal3D.create(widget.width, widget.height);
-    if (_engine != null) {
-      _seedScene();
-      _ticker = createTicker(_tick)..start();
-    } else {
-      _ticker = createTicker((_) {});
-    }
+    _seedScene();
+    _ticker = createTicker(_tick)..start();
   }
 
   void _seedScene() {
@@ -250,10 +251,6 @@ class _Scene3DViewState extends State<Scene3DView>
     final t = _clock.elapsedMilliseconds / 1000.0;
     widget.onFrame?.call(_engine!, t);
     final rgba = _engine!.renderRgba();
-    if (rgba == null) {
-      _busy = false;
-      return;
-    }
     ui.decodeImageFromPixels(
       rgba,
       widget.width,
@@ -284,25 +281,12 @@ class _Scene3DViewState extends State<Scene3DView>
 
   @override
   Widget build(BuildContext context) {
-    if (_engine == null) {
-      return Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF14171F),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: const Center(
-          child: Text(
-            '3D 后端未加载\n（需要 libgalatea_3d.so）',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11, color: Colors.white38, height: 1.6),
-          ),
-        ),
-      );
-    }
     final img = _image;
     if (img == null) {
-      return Container(color: const Color(0xFF0B0D12));
+      // 只可能是"第一帧还没渲染完"，不是错误状态
+      return const ColoredBox(color: Color(0xFF0B0D12));
     }
-    return RawImage(image: img, fit: BoxFit.cover, filterQuality: FilterQuality.medium);
+    return RawImage(
+        image: img, fit: BoxFit.cover, filterQuality: FilterQuality.medium);
   }
 }

@@ -337,40 +337,15 @@ class _PlayerPageState extends State<PlayerPage> {
           ],
         ),
       ),
-      child: say?.bg == null
-          ? null
-          : Image.asset(say!.bg!, fit: BoxFit.cover, errorBuilder: (_, __, ___) {
-              return const SizedBox.shrink();
-            }),
+      // 背景图加载失败就让 Image.asset 抛（Flutter 日志里有确切路径）
+      child: say?.bg == null ? null : Image.asset(say!.bg!, fit: BoxFit.cover),
     );
   }
 
   Widget _portrait(String path) {
     final h = MediaQuery.of(context).size.height * 0.62;
-    return Image.asset(
-      path,
-      height: h,
-      errorBuilder: (_, __, ___) => Container(
-        width: 150,
-        height: 320,
-        decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(Radius.circular(10)),
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              GColors.accent.withOpacity(0.25),
-              Colors.transparent,
-            ],
-          ),
-        ),
-        child: const Center(
-          child: Text('立绘\n（资源未接入）',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white38, fontSize: 12)),
-        ),
-      ),
-    );
+    // 立绘缺失/损坏 → 让 Image.asset 抛，日志里有确切路径
+    return Image.asset(path, height: h);
   }
 
   Widget _dialogue(SayEvent? say) {

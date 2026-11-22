@@ -57,3 +57,27 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
+
+  rules:
+    name: 代码纪律（RULES.md）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 禁止静默降级 / 空捕获 / 占位
+        run: |
+          fail=0
+          check() {
+            if grep -rnE "$1" $2 --include="$3" 2>/dev/null; then
+              echo "::error::违反 RULES.md 第 $4 条：$5"
+              fail=1
+            fi
+          }
+          check 'catch\s*\(\s*_\s*\)\s*\{\s*\}' app/lib dart "2" "空捕获 catch (_) {}"
+          check 'errorBuilder' app/lib dart "1" "errorBuilder 吞掉图片错误"
+          check '\?\? const SizedBox' app/lib dart "1" "?? const SizedBox 占位"
+          check 'catch\s*\(\s*_\s*\)\s*\{\s*continue' app/lib dart "2" "catch (_) { continue }"
+          if [ $fail -ne 0 ]; then
+            echo "修复方式见 RULES.md：要么能跑，要么明确地坏，不许偷偷降级。"
+            exit 1
+          fi
+          echo "✅ 没有发现静默降级 / 空捕获"

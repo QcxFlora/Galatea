@@ -38,9 +38,12 @@ class GalateaApp extends StatelessWidget {
       builder: (context, child) {
         // 全局锁死文字缩放，避免系统字号把瑞士栅格撑破
         final mq = MediaQuery.of(context);
+        if (child == null) {
+          throw StateError('MaterialApp.builder 收到空 child：路由没挂上');
+        }
         return MediaQuery(
           data: mq.copyWith(textScaler: const TextScaler.linear(1.0)),
-          child: child ?? const SizedBox.shrink(),
+          child: child,
         );
       },
     );

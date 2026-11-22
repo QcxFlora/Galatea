@@ -28,6 +28,8 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<File> _books = const [];
   Map<String, String> _titles = {};
+  /// 打不开的作品：路径 → 错误原因（书柜上显示成红色「损坏」）
+  Map<String, String> _errors = {};
   bool _loading = true;
 
   @override
@@ -38,22 +40,25 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _refresh() async {
-    try {
-      final list = await ProjectStore.listGal();
-      final titles = <String, String>{};
-      for (final f in list) {
+    final list = await ProjectStore.listGal();
+    final titles = <String, String>{};
+    final errors = <String, String>{};
+    for (final f in list) {
+      // 单个作品坏了不代表整个书柜打不开，但**必须**在界面上标红说明
+      try {
         titles[f.path] = ProjectStore.titleOf(f);
+      } on Exception catch (e) {
+        titles[f.path] = f.uri.pathSegments.last;
+        errors[f.path] = e.toString();
       }
-      if (!mounted) return;
-      setState(() {
-        _books = list;
-        _titles = titles;
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _loading = false);
     }
+    if (!mounted) return;
+    setState(() {
+      _books = list;
+      _titles = titles;
+      _errors = errors;
+      _loading = false;
+    });
   }
 
   Future<void> _open(LoadedProject p) async {
@@ -191,6 +196,8 @@ class _HomePageState extends State<HomePage> {
                                 Padding(
                                   padding: const EdgeInsets.only(bottom: 14),
                                   child: _RecordCard(
+                                    broken: _errors.containsKey(_books[i].path),
+                                    error: _errors[_books[i].path],
                                     title: _titles[_books[i].path] ??
                                         _books[i].uri.pathSegments.last,
                                     sizeKb: _books[i].existsSync()
@@ -199,12 +206,8 @@ class _HomePageState extends State<HomePage> {
                                     seed: i,
                                     latest: i == 0,
                                     onTap: () async {
-                                      try {
-                                        await _open(await ProjectStore.open(
-                                            _books[i]));
-                                      } catch (e) {
-                                        _toast('打不开：$e');
-                                      }
+                                      await _open(
+                                          await ProjectStore.open(_books[i]));
                                     },
                                     onLongPress: () => _delete(_books[i]),
                                   ),
@@ -349,6 +352,8 @@ class _RecordCard extends StatelessWidget {
   final int sizeKb;
   final int seed;
   final bool latest;
+  final bool broken;
+  final String? error;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
@@ -357,6 +362,8 @@ class _RecordCard extends StatelessWidget {
     required this.sizeKb,
     required this.seed,
     required this.latest,
+    this.broken = false,
+    this.error,
     required this.onTap,
     required this.onLongPress,
   });
@@ -397,7 +404,23 @@ class _RecordCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (latest)
+                    if (broken)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: GColors.err.withOpacity(0.12),
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(20)),
+                        ),
+                        child: const Text('损坏 · 点开看原因',
+                            style: TextStyle(
+                                fontSize: 9,
+                                color: GColors.err,
+                                letterSpacing: 0.6)),
+                      ),
+                    if (latest && !broken)
                       Container(
                         padding:
                             const EdgeInsets.symmetric(horizontal: 7, vertical: 2),

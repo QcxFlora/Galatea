@@ -61,24 +61,23 @@ class ProjectStore {
     return files;
   }
 
-  /// 只读标题（书脊用），失败时退回文件名
+  /// 只读标题（书脊用）。
+  ///
+  /// **坏了就抛**——不在这一层假装"还行"。
+  /// 调用方（书柜）负责把它显示成红色「损坏」条目并给出具体原因。
   static String titleOf(File f) {
-    try {
-      final arc = GalArchive.fromFile(f);
-      final raw = arc.readStoryRaw();
-      final doc = compactUnpack(jsonDecode(raw));
-      if (doc is Map) {
-        final meta = doc['meta'];
-        if (meta is Map && meta['title'] is String) {
-          final t = meta['title'] as String;
-          if (t.trim().isNotEmpty) return t;
-        }
-      }
-    } catch (_) {
-      // 损坏或旧格式，退回文件名
+    final arc = GalArchive.fromFile(f);
+    final raw = arc.readStoryRaw();
+    final doc = compactUnpack(jsonDecode(raw));
+    if (doc is! Map) {
+      throw FormatException('${f.path} 的剧本不是 JSON 对象');
     }
-    final n = f.uri.pathSegments.last;
-    return n.toLowerCase().endsWith('.gal') ? n.substring(0, n.length - 4) : n;
+    final meta = doc['meta'];
+    if (meta is Map && meta['title'] is String) {
+      final t = (meta['title'] as String).trim();
+      if (t.isNotEmpty) return t;
+    }
+    throw FormatException('${f.path} 缺少 meta.title');
   }
 
   /// 打开一个作品

@@ -26,19 +26,11 @@ class GameLauncher {
       // 共享目录：Godot 运行时（或用户手动）从这里读取
       final dir = Directory('/storage/emulated/0/Download/Galatea');
       if (!await dir.exists()) {
-        try {
-          await dir.create(recursive: true);
-        } catch (_) {
-          return null;
-        }
+        await dir.create(recursive: true);
       }
       final dst = File('${dir.path}/${src.uri.pathSegments.last}');
-      try {
-        await src.copy(dst.path);
-        return dst.path;
-      } catch (_) {
-        return null;
-      }
+      await src.copy(dst.path);
+      return dst.path;
     }
     return src.path;
   }
@@ -63,15 +55,17 @@ class GameLauncher {
     // 2) 桌面：找得到 godot 就直接起
     if (!kIsWeb && (Platform.isLinux || Platform.isMacOS || Platform.isWindows)) {
       final candidates = ['godot', 'godot4', 'Godot'];
+      final failures = <String>[];
       for (final bin in candidates) {
         try {
           await Process.start(bin, ['--path', 'godot', '--', staged],
               mode: ProcessStartMode.detached);
           return true;
-        } catch (_) {
-          continue;
+        } on ProcessException catch (e) {
+          failures.add('$bin → ${e.message}');
         }
       }
+      debugPrint('没有可用的 Godot 可执行文件：\n${failures.join("\n")}');
     }
 
     // 3) 兜底：把路径复制到剪贴板
@@ -111,8 +105,8 @@ Future<bool> hasGodotRuntime() async {
   try {
     final v = await GameLauncher._channel.invokeMethod<bool>('hasRuntime');
     return v ?? false;
-  } catch (_) {
-    return false;
+  } on MissingPluginException {
+    return false; // 原生侧没实现 hasRuntime：这是"能力不存在"，不是"失败了"
   }
 }
 
