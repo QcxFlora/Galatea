@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
 import '../editor/editor_page.dart';
+import '../engine/spring.dart';
 import '../models/graph.dart';
 import '../storage/store.dart';
 import '../theme.dart';
@@ -325,19 +326,31 @@ class _TitleBlock extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        ShaderMask(
-          shaderCallback: (rect) => const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFF2F5FF), Color(0xFF93A5FF), Color(0xFF5A6BD8)],
-          ).createShader(rect),
-          child: const Text(
-            'GALATEA',
-            style: TextStyle(
-              fontSize: 52,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 2,
-              color: Colors.white,
+        SpringBuilder(
+          begin: -110,
+          target: 0,
+          preset: SpringPreset.bouncy,
+          builder: (_, dy) => Transform.translate(
+            offset: Offset(0, dy),
+            child: ShaderMask(
+              shaderCallback: (rect) => const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFFF2F5FF),
+                  Color(0xFF93A5FF),
+                  Color(0xFF5A6BD8)
+                ],
+              ).createShader(rect),
+              child: const Text(
+                'GALATEA',
+                style: TextStyle(
+                  fontSize: 52,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ),
         ),

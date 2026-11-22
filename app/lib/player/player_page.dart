@@ -8,6 +8,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../engine/spring.dart';
 import '../engine/vm.dart';
 import '../models/graph.dart';
 import '../storage/store.dart';
@@ -283,15 +284,23 @@ class _PlayerPageState extends State<PlayerPage> {
             right: 0,
             bottom: 0,
             child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                child: choices != null
-                    ? _choiceList(choices)
-                    : (ending != null
-                        ? _endingCard(ending)
-                        : (halt != null
-                            ? _haltCard(halt)
-                            : _dialogue(say))),
+              child: SpringBuilder(
+                begin: 130,
+                target: 0,
+                preset: SpringPreset.smooth,
+                builder: (_, dy) => Transform.translate(
+                  offset: Offset(0, dy),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    child: choices != null
+                        ? _choiceList(choices)
+                        : (ending != null
+                            ? _endingCard(ending)
+                            : (halt != null
+                                ? _haltCard(halt)
+                                : _dialogue(say))),
+                  ),
+                ),
               ),
             ),
           ),
@@ -414,7 +423,15 @@ class _PlayerPageState extends State<PlayerPage> {
                     color: Colors.white70, fontSize: 14, height: 1.5)),
           ),
         for (var i = 0; i < e.options.length; i++)
-          Padding(
+          SpringBuilder(
+            key: ValueKey('choice-${e.node}-$i'),
+            begin: 70,
+            target: 0,
+            preset: SpringPreset.bouncy,
+            delay: Duration(milliseconds: 55 * i),
+            builder: (_, dy) => Transform.translate(
+              offset: Offset(0, dy),
+              child: Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: GestureDetector(
               onTap: () => _choose(i),
@@ -432,6 +449,8 @@ class _PlayerPageState extends State<PlayerPage> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 14.5, color: GColors.text),
                 ),
+              ),
+            ),
               ),
             ),
           ),

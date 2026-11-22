@@ -4,9 +4,12 @@ analyzer:
   language:
     strict-casts: false
   errors:
+    # Flutter 3.47+ 把 material.dart 与 withOpacity 标记为弃用。
+    # 这里降级为忽略，避免在过渡期用 npm 式的噪音淹没真正的错误。
+    deprecated_member_use: ignore
     todo: ignore
 
 linter:
   rules:
-    prefer_const_constructors: true
+    prefer_const_constructors: false
     avoid_print: true
