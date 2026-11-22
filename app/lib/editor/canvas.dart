@@ -60,6 +60,9 @@ Offset portWorldPos(StoryNode n, int index, int count) =>
 
 Offset entryWorldPos(StoryNode n) => Offset(n.x, n.y + kNodeH / 2);
 
+/// 吸附到 8px 栅格
+double _snap8(double v) => (v / 8).roundToDouble() * 8;
+
 class GraphCanvas extends StatefulWidget {
   final Story story;
   final String? selectedId;
@@ -248,8 +251,9 @@ class _GraphCanvasState extends State<GraphCanvas> {
                       if (_dragNode != n.id) return;
                       final w = _toWorld(_toLocal(global));
                       setState(() {
-                        n.x = _dragNodeStart.dx + (w.dx - _dragPointerStart.dx);
-                        n.y = _dragNodeStart.dy + (w.dy - _dragPointerStart.dy);
+                        // 吸附 8px 栅格：瑞士风格的"机械对齐"
+                        n.x = _snap8(_dragNodeStart.dx + (w.dx - _dragPointerStart.dx));
+                        n.y = _snap8(_dragNodeStart.dy + (w.dy - _dragPointerStart.dy));
                       });
                     },
                     onDragEnd: () {
@@ -365,47 +369,44 @@ class _NodeCard extends StatelessWidget {
               width: kNodeW,
               height: kNodeH,
               decoration: BoxDecoration(
-                color: playing ? const Color(0xFF232C42) : GColors.panel,
-                borderRadius: BorderRadius.circular(12),
+                color: selected ? GColors.panel2 : GColors.panel,
                 border: Border.all(
-                  color: playing
-                      ? GColors.warn
-                      : (selected ? accent : GColors.line),
-                  width: selected || playing ? 2 : 1,
+                  color: (selected || playing) ? GColors.accent : GColors.line,
+                  width: (selected || playing) ? 2 : 1,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.35),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    height: 30,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: accent.withOpacity(0.16),
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(11)),
+                    height: 26,
+                    padding: const EdgeInsets.only(right: 6),
+                    decoration: const BoxDecoration(
+                      border: Border(bottom: BorderSide(color: GColors.line)),
                     ),
                     child: Row(
                       children: [
-                        Text(nodeTypeIcon(node.type),
-                            style: const TextStyle(fontSize: 12)),
-                        const SizedBox(width: 6),
+                        Container(width: 3, height: 26, color: accent),
+                        const SizedBox(width: 8),
+                        Text(
+                          GColors.typeCode(nodeTypeId(node.type)),
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.1,
+                            color: accent,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             node.displayTitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: accent,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                              color: GColors.text,
                             ),
                           ),
                         ),
@@ -415,9 +416,9 @@ class _NodeCard extends StatelessWidget {
                           child: Padding(
                             padding: const EdgeInsets.all(2),
                             child: Icon(
-                              isStart ? Icons.star : Icons.star_border,
-                              size: 15,
-                              color: isStart ? GColors.warn : GColors.dim,
+                              isStart ? Icons.play_arrow : Icons.play_arrow_outlined,
+                              size: 14,
+                              color: isStart ? GColors.accent : GColors.dim,
                             ),
                           ),
                         ),
@@ -426,14 +427,14 @@ class _NodeCard extends StatelessWidget {
                   ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                      padding: const EdgeInsets.fromLTRB(11, 7, 9, 6),
                       child: Text(
                         node.summary.isEmpty ? '（空）' : node.summary,
                         maxLines: 4,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 12,
-                          height: 1.35,
+                          fontSize: 11.5,
+                          height: 1.45,
                           color: GColors.text,
                         ),
                       ),
@@ -647,7 +648,7 @@ class _ZoomBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: GColors.panel.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.zero,
         border: Border.all(color: GColors.line),
       ),
       child: Row(

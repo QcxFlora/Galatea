@@ -51,7 +51,7 @@ class _CharactersSheetState extends State<CharactersSheet> {
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: GColors.panel2,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.zero,
                       border: Border.all(color: GColors.line),
                     ),
                     child: Row(
@@ -183,7 +183,7 @@ class _VarsSheetState extends State<VarsSheet> {
                         horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: GColors.panel2,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.zero,
                       border: Border.all(color: GColors.line),
                     ),
                     child: Row(

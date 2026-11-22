@@ -284,6 +284,7 @@ class _PlayerPageState extends State<PlayerPage> {
             right: 0,
             bottom: 0,
             child: SafeArea(
+              bottom: false,
               child: SpringBuilder(
                 begin: 130,
                 target: 0,
@@ -291,7 +292,11 @@ class _PlayerPageState extends State<PlayerPage> {
                 builder: (_, dy) => Transform.translate(
                   offset: Offset(0, dy),
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    padding: EdgeInsets.fromLTRB(
+                        16,
+                        0,
+                        16,
+                        14 + MediaQuery.of(context).viewPadding.bottom),
                     child: choices != null
                         ? _choiceList(choices)
                         : (ending != null
@@ -310,7 +315,7 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Widget _background(SayEvent? say) {
-    final tint = say?.color != null ? _parseColor(say!.color!) : null;
+    const Color? tint = null; // 瑞士风格：背景不做角色染色
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -338,7 +343,7 @@ class _PlayerPageState extends State<PlayerPage> {
         width: 150,
         height: 320,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.zero,
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -359,44 +364,47 @@ class _PlayerPageState extends State<PlayerPage> {
 
   Widget _dialogue(SayEvent? say) {
     final name = say?.speakerName ?? '';
-    final color = say?.color != null
-        ? (_parseColor(say!.color!) ?? GColors.accent)
-        : GColors.dim;
     return GestureDetector(
       onTap: _tapText,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 150),
+        constraints: const BoxConstraints(minHeight: 132),
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-        decoration: BoxDecoration(
-          color: const Color(0xEE0D1119),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: GColors.line),
+        decoration: const BoxDecoration(
+          color: Color(0xF20A0A0A),
+          border: Border(
+            top: BorderSide(color: GColors.line, width: 1),
+            left: BorderSide(color: GColors.line, width: 1),
+            right: BorderSide(color: GColors.line, width: 1),
+            bottom: BorderSide(color: GColors.line, width: 1),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             if (name.isNotEmpty)
-              Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.18),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: color.withOpacity(0.6)),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  children: [
+                    Container(width: 3, height: 13, color: GColors.accent),
+                    const SizedBox(width: 8),
+                    Text(
+                      name,
+                      style: const TextStyle(
+                          color: GColors.textStrong,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.4),
+                    ),
+                  ],
                 ),
-                child: Text(name,
-                    style: TextStyle(
-                        color: color,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600)),
               ),
             Text(
               shown.isEmpty ? ' ' : shown,
               style: const TextStyle(
-                  fontSize: 15.5, height: 1.7, color: GColors.text),
+                  fontSize: 15, height: 1.75, color: GColors.text),
             ),
             const SizedBox(height: 6),
             const Align(
@@ -440,14 +448,28 @@ class _PlayerPageState extends State<PlayerPage> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                 decoration: BoxDecoration(
-                  color: const Color(0xEE141A26),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: GColors.accent2.withOpacity(0.55)),
+                  color: const Color(0xFF141414),
+                  border: Border.all(color: GColors.line, width: 1),
                 ),
-                child: Text(
-                  e.options[i].text,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14.5, color: GColors.text),
+                child: Row(
+                  children: [
+                    Text(
+                      '${i + 1}'.padLeft(2, '0'),
+                      style: const TextStyle(
+                          fontSize: 10,
+                          fontFamily: 'monospace',
+                          color: GColors.dim,
+                          letterSpacing: 1),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        e.options[i].text,
+                        style: const TextStyle(
+                            fontSize: 14, color: GColors.text),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -462,15 +484,18 @@ class _PlayerPageState extends State<PlayerPage> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xEE0D1119),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: GColors.warn.withOpacity(0.6)),
+        color: const Color(0xF20A0A0A),
+        border: Border.all(color: GColors.accent, width: 2),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('★ 结局',
-              style: TextStyle(color: GColors.warn, fontSize: 13)),
+          const Text('ENDING',
+              style: TextStyle(
+                  color: GColors.accent,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 3)),
           const SizedBox(height: 6),
           Text(e.ending,
               style: const TextStyle(
@@ -510,7 +535,7 @@ class _PlayerPageState extends State<PlayerPage> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: const Color(0xEE0D1119),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.zero,
         border: Border.all(color: GColors.err.withOpacity(0.6)),
       ),
       child: Column(

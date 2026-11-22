@@ -363,6 +363,7 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   Widget _toolbar() {
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     const types = [
       NodeType.say,
       NodeType.choice,
@@ -375,11 +376,13 @@ class _EditorPageState extends State<EditorPage> {
       NodeType.script,
     ];
     return Container(
-      height: 62,
       color: GColors.panel,
-      child: ListView(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: SizedBox(
+        height: 52,
+        child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         children: [
           for (final t in types)
             Padding(
@@ -392,6 +395,7 @@ class _EditorPageState extends State<EditorPage> {
               ),
             ),
         ],
+        ),
       ),
     );
   }
@@ -562,7 +566,7 @@ class _EditorPageState extends State<EditorPage> {
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: GColors.bg,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.zero,
                   ),
                   child: SingleChildScrollView(
                     child: SelectableText(
@@ -654,22 +658,28 @@ class _ToolChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: Tooltip(
+        message: '$icon $label',
+        waitDuration: const Duration(milliseconds: 600),
+        child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.14),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.5)),
+          color: GColors.panel2,
+          border: Border.all(color: GColors.line, width: 1),
         ),
         child: Row(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 14)),
-            const SizedBox(width: 6),
+            Container(width: 2, height: 14, color: color),
+            const SizedBox(width: 8),
             Text(label,
-                style: TextStyle(
-                    fontSize: 12.5, color: color, fontWeight: FontWeight.w600)),
+                style: const TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 0.6,
+                    color: GColors.text,
+                    fontWeight: FontWeight.w600)),
           ],
         ),
+      ),
       ),
     );
   }

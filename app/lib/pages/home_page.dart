@@ -175,8 +175,10 @@ class _HomePageState extends State<HomePage> {
         children: [
           const Positioned.fill(child: _StageBackground()),
           SafeArea(
+            bottom: false,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
+              padding: EdgeInsets.fromLTRB(
+                  28, 24, 28, 32 + MediaQuery.of(context).viewPadding.bottom),
               children: [
                 const _TitleBlock(),
                 const SizedBox(height: 30),
@@ -264,19 +266,26 @@ class _StageBackground extends StatelessWidget {
             ),
           ),
         ),
-        // 光斑（对应 Web 版的 radial-gradient）
+        // 来自星尘：一组极淡的同心轨道
         Positioned(
+          right: -160,
           top: -120,
-          right: -80,
           child: Container(
-            width: 320,
-            height: 320,
+            width: 520,
+            height: 520,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: RadialGradient(colors: [
-                GColors.accent2.withOpacity(0.18),
-                Colors.transparent,
-              ]),
+              border: Border.all(color: Colors.white.withOpacity(0.055)),
+            ),
+            child: Center(
+              child: Container(
+                width: 340,
+                height: 340,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withOpacity(0.04)),
+                ),
+              ),
             ),
           ),
         ),
@@ -303,7 +312,7 @@ class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = GColors.accent.withOpacity(0.16)
+      ..color = Colors.white.withOpacity(0.045)
       ..strokeWidth = 1;
     const step = 56.0;
     for (var x = 0.0; x < size.width; x += step) {
@@ -329,39 +338,35 @@ class _TitleBlock extends StatelessWidget {
         SpringBuilder(
           begin: -110,
           target: 0,
-          preset: SpringPreset.bouncy,
+          preset: SpringPreset.smooth,
           builder: (_, dy) => Transform.translate(
             offset: Offset(0, dy),
-            child: ShaderMask(
-              shaderCallback: (rect) => const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFFF2F5FF),
-                  Color(0xFF93A5FF),
-                  Color(0xFF5A6BD8)
-                ],
-              ).createShader(rect),
-              child: const Text(
-                'GALATEA',
-                style: TextStyle(
-                  fontSize: 52,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                  color: Colors.white,
+            child: Column(
+              children: [
+                const Text(
+                  'GALATEA',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 7,
+                    height: 1,
+                    color: GColors.textStrong,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 12),
+                Container(width: 44, height: 3, color: GColors.accent),
+              ],
             ),
           ),
         ),
         const SizedBox(height: 6),
-        const Text('思 维 导 图 式   G A L G A M E   引 擎',
-            style: TextStyle(
-                fontSize: 11.5, color: GColors.dim, letterSpacing: 1.2)),
+        Text('MIND-MAP GALGAME ENGINE',
+            style: labelStyle(color: GColors.dim, size: 10)),
         const SizedBox(height: 10),
         const Text('剧情是一张图 · 连线即分支 · 一键打包成游戏',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.5, color: Color(0xFFB9C2D6), height: 1.7)),
+            style: TextStyle(fontSize: 12, color: GColors.dim, height: 1.6)),
       ],
     );
   }
@@ -391,54 +396,41 @@ class _EntryCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: highlight
-                ? [color.withOpacity(0.34), color.withOpacity(0.16)]
-                : [color.withOpacity(0.14), color.withOpacity(0.05)],
-          ),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(highlight ? 0.8 : 0.45)),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.18),
-              blurRadius: 22,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          color: GColors.panel,
+          border: Border.all(color: GColors.line, width: 1),
         ),
         child: Row(
           children: [
+            // 左侧 3px 竖线：唯一彩色只给「首要操作」
             Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(11),
-                border: Border.all(color: color.withOpacity(0.5)),
-              ),
-              child: Text(icon, style: TextStyle(fontSize: 18, color: color)),
+              width: 3,
+              height: 38,
+              color: highlight ? GColors.accent : GColors.dim,
             ),
-            const SizedBox(width: 13),
+            const SizedBox(width: 14),
+            Text(icon,
+                style: TextStyle(
+                    fontSize: 13,
+                    color: highlight ? GColors.accent : GColors.dim)),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
                       style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: GColors.text)),
-                  const SizedBox(height: 3),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3,
+                          color: GColors.textStrong)),
+                  const SizedBox(height: 4),
                   Text(subtitle,
                       style: const TextStyle(
-                          fontSize: 11.5, color: GColors.dim, height: 1.4)),
+                          fontSize: 11, color: GColors.dim, height: 1.4)),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: color.withOpacity(0.7), size: 20),
+            const Icon(Icons.arrow_forward, color: GColors.dim, size: 15),
           ],
         ),
       ),
@@ -481,7 +473,7 @@ class _ProjectTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
           color: GColors.panel,
-          borderRadius: BorderRadius.circular(11),
+          borderRadius: BorderRadius.zero,
           border: Border.all(color: GColors.line),
         ),
         child: Row(
