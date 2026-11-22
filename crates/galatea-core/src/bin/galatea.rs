@@ -133,6 +133,8 @@ fn cmd_new(file: &str, title: String) -> Result<(), String> {
             text: "……你终于来了。".into(),
             bg: None,
             portrait: None,
+            cast: None,
+            art: None,
             next: Some("ask".into()),
         },
     });
@@ -171,6 +173,8 @@ fn cmd_new(file: &str, title: String) -> Result<(), String> {
             text: "那就好。".into(),
             bg: None,
             portrait: None,
+            cast: None,
+            art: None,
             next: Some("end_good".into()),
         },
     });
@@ -184,6 +188,8 @@ fn cmd_new(file: &str, title: String) -> Result<(), String> {
             text: "她的眼神暗了下去。".into(),
             bg: None,
             portrait: None,
+            cast: None,
+            art: None,
             next: Some("end_bad".into()),
         },
     });

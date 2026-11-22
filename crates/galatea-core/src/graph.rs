@@ -148,6 +148,10 @@ pub enum NodeKind {
         bg: Option<String>,
         portrait: Option<String>,
         next: Option<String>,
+        /// 连到 character 方块（这句是谁说的）
+        cast: Option<String>,
+        /// 连到 portrait 方块（这句用哪张立绘）
+        art: Option<String>,
     },
     /// 选项分支
     Choice {
@@ -173,6 +177,27 @@ pub enum NodeKind {
     Return,
     /// 结局
     End { ending: String, text: String },
+    /// 角色卡：这台机器上的「演员表」
+    Character {
+        key: String,
+        name: String,
+        color: Option<String>,
+        portraits: Vec<String>,
+        next: Option<String>,
+    },
+    /// 立绘资源
+    Portrait {
+        character: Option<String>,
+        asset: String,
+        expr: Option<String>,
+        next: Option<String>,
+    },
+    /// 背景资源
+    Background {
+        asset: String,
+        scene: Option<String>,
+        next: Option<String>,
+    },
     /// 自定义 Rust 脚本：执行一段自己的逻辑（动画曲线 / 首界面 / 小游戏）
     /// `code` 是内联源码，`src` 是相对路径（二选一）
     Script {
@@ -195,6 +220,9 @@ impl NodeKind {
             NodeKind::Return => "return",
             NodeKind::End { .. } => "end",
             NodeKind::Script { .. } => "script",
+            NodeKind::Character { .. } => "character",
+            NodeKind::Portrait { .. } => "portrait",
+            NodeKind::Background { .. } => "background",
         }
     }
 
@@ -209,8 +237,24 @@ impl NodeKind {
             NodeKind::Return => "#8892a8",
             NodeKind::End { .. } => "#ff5c74",
             NodeKind::Script { .. } => "#ff7a45",
+            NodeKind::Character { .. } => "#7aa2f7",
+            NodeKind::Portrait { .. } => "#c3a6ff",
+            NodeKind::Background { .. } => "#68d5ba",
         }
     }
+}
+
+/// 一组方块（用于合并显示 / 分组管理）
+#[derive(Debug, Clone)]
+pub struct Group {
+    pub id: String,
+    pub title: String,
+    /// 这一组是否折叠成"一个合并方块"（每组的独立开关）
+    pub collapsed: bool,
+    pub nodes: Vec<String>,
+    pub color: Option<String>,
+    /// 父组 id（合并块可以再分组，v0.2 只做一层嵌套）
+    pub parent: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -233,7 +277,25 @@ impl Node {
     pub fn ports(&self) -> Vec<(String, String)> {
         let mut v = Vec::new();
         match &self.kind {
-            NodeKind::Say { next, .. } | NodeKind::Set { next, .. } => {
+            NodeKind::Say { next, cast, art, .. } => {
+                if let Some(n) = next {
+                    v.push(("next".to_string(), n.clone()));
+                }
+                if let Some(c) = cast {
+                    v.push(("cast".to_string(), c.clone()));
+                }
+                if let Some(a) = art {
+                    v.push(("art".to_string(), a.clone()));
+                }
+            }
+            NodeKind::Set { next, .. } => {
+                if let Some(n) = next {
+                    v.push(("next".to_string(), n.clone()));
+                }
+            }
+            NodeKind::Character { next, .. }
+            | NodeKind::Portrait { next, .. }
+            | NodeKind::Background { next, .. } => {
                 if let Some(n) = next {
                     v.push(("next".to_string(), n.clone()));
                 }
@@ -280,6 +342,11 @@ impl Node {
     pub fn set_port(&mut self, port: &str, target: Option<String>) {
         match (&mut self.kind, port) {
             (NodeKind::Say { next, .. }, "next") => *next = target,
+            (NodeKind::Say { cast, .. }, "cast") => *cast = target,
+            (NodeKind::Say { art, .. }, "art") => *art = target,
+            (NodeKind::Character { next, .. }, "next") => *next = target,
+            (NodeKind::Portrait { next, .. }, "next") => *next = target,
+            (NodeKind::Background { next, .. }, "next") => *next = target,
             (NodeKind::Set { next, .. }, "next") => *next = target,
             (NodeKind::Script { next, .. }, "next") => *next = target,
             (NodeKind::Branch { yes, .. }, "yes") => *yes = target,
@@ -327,6 +394,8 @@ pub struct Story {
     pub characters: BTreeMap<String, Character>,
     pub vars: BTreeMap<String, Json>,
     pub nodes: Vec<Node>,
+    /// 分组 / 合并显示
+    pub groups: Vec<Group>,
     #[allow(dead_code)]
     index: HashMap<String, usize>,
 }
@@ -343,6 +412,7 @@ impl Story {
             characters: BTreeMap::new(),
             vars: BTreeMap::new(),
             nodes: Vec::new(),
+            groups: Vec::new(),
             index: HashMap::new(),
         }
     }
@@ -434,12 +504,16 @@ impl Story {
                 bg,
                 portrait,
                 next,
+                cast,
+                art,
             } => {
                 opt(speaker, "speaker", &mut o);
                 o.set("text", Json::s(text.clone()));
                 opt(bg, "bg", &mut o);
                 opt(portrait, "portrait", &mut o);
                 opt(next, "next", &mut o);
+                opt(cast, "cast", &mut o);
+                opt(art, "art", &mut o);
             }
             NodeKind::Choice { prompt, options } => {
                 o.set("prompt", Json::s(prompt.clone()));
@@ -481,6 +555,46 @@ impl Story {
                 if !text.is_empty() {
                     o.set("text", Json::s(text.clone()));
                 }
+            }
+            NodeKind::Character {
+                key,
+                name,
+                color,
+                portraits,
+                next,
+            } => {
+                o.set("key", Json::s(key.clone()));
+                o.set("name", Json::s(name.clone()));
+                if let Some(c) = color {
+                    o.set("color", Json::s(c.clone()));
+                }
+                if !portraits.is_empty() {
+                    o.set(
+                        "portraits",
+                        Json::Arr(portraits.iter().map(|p| Json::s(p.clone())).collect()),
+                    );
+                }
+                opt(next, "next", &mut o);
+            }
+            NodeKind::Portrait {
+                character,
+                asset,
+                expr,
+                next,
+            } => {
+                opt(character, "character", &mut o);
+                o.set("asset", Json::s(asset.clone()));
+                opt(expr, "expr", &mut o);
+                opt(next, "next", &mut o);
+            }
+            NodeKind::Background {
+                asset,
+                scene,
+                next,
+            } => {
+                o.set("asset", Json::s(asset.clone()));
+                opt(scene, "scene", &mut o);
+                opt(next, "next", &mut o);
             }
             NodeKind::Script {
                 code,
@@ -541,6 +655,26 @@ impl Story {
             nodes.push(self.node_to_json(n));
         }
         root.set("nodes", nodes);
+
+        let mut groups = Json::arr();
+        for g in &self.groups {
+            let mut go = Json::obj();
+            go.set("id", Json::s(g.id.clone()));
+            go.set("title", Json::s(g.title.clone()));
+            go.set("collapsed", Json::b(g.collapsed));
+            go.set(
+                "nodes",
+                Json::Arr(g.nodes.iter().map(|n| Json::s(n.clone())).collect()),
+            );
+            if let Some(c) = &g.color {
+                go.set("color", Json::s(c.clone()));
+            }
+            if let Some(p) = &g.parent {
+                go.set("parent", Json::s(p.clone()));
+            }
+            groups.push(go);
+        }
+        root.set("groups", groups);
         root
     }
 
@@ -634,12 +768,39 @@ impl Story {
                     ending: nj.s_or("ending", "end"),
                     text: nj.s_or("text", ""),
                 },
+                "character" => NodeKind::Character {
+                    key: nj.s_or("key", &id),
+                    name: {
+                        let n = nj.s_or("name", "");
+                        if n.is_empty() { nj.s_or("key", "角色") } else { n }
+                    },
+                    color: nj.opt_str("color"),
+                    portraits: nj
+                        .arr_or_empty("portraits")
+                        .iter()
+                        .filter_map(|v| v.as_str().map(|x| x.to_string()))
+                        .collect(),
+                    next: nj.opt_str("next").filter(|s| !s.is_empty()),
+                },
+                "portrait" => NodeKind::Portrait {
+                    character: nj.opt_str("character").filter(|s| !s.is_empty()),
+                    asset: nj.s_or("asset", ""),
+                    expr: nj.opt_str("expr").filter(|s| !s.is_empty()),
+                    next: nj.opt_str("next").filter(|s| !s.is_empty()),
+                },
+                "background" => NodeKind::Background {
+                    asset: nj.s_or("asset", ""),
+                    scene: nj.opt_str("scene").filter(|s| !s.is_empty()),
+                    next: nj.opt_str("next").filter(|s| !s.is_empty()),
+                },
                 _ => NodeKind::Say {
                     speaker: nj.opt_str("speaker").filter(|s| !s.is_empty()),
                     text: nj.s_or("text", ""),
                     bg: nj.opt_str("bg").filter(|s| !s.is_empty()),
                     portrait: nj.opt_str("portrait").filter(|s| !s.is_empty()),
                     next: nj.opt_str("next").filter(|s| !s.is_empty()),
+                    cast: nj.opt_str("cast").filter(|s| !s.is_empty()),
+                    art: nj.opt_str("art").filter(|s| !s.is_empty()),
                 },
             };
             let node = Node {
@@ -650,6 +811,24 @@ impl Story {
                 kind,
             };
             s.add_node(node);
+        }
+        for gj in j.arr_or_empty("groups") {
+            let gid = gj.s_or("id", "");
+            if gid.is_empty() {
+                continue;
+            }
+            s.groups.push(Group {
+                id: gid,
+                title: gj.s_or("title", "分组"),
+                collapsed: gj.bool_or("collapsed", false),
+                nodes: gj
+                    .arr_or_empty("nodes")
+                    .iter()
+                    .filter_map(|v| v.as_str().map(|x| x.to_string()))
+                    .collect(),
+                color: gj.opt_str("color"),
+                parent: gj.opt_str("parent").filter(|x| !x.is_empty()),
+            });
         }
         Ok(s)
     }
@@ -678,6 +857,8 @@ impl Story {
                 bg: None,
                 portrait: None,
                 next: None,
+                cast: None,
+                art: None,
             },
         }
     }
@@ -772,5 +953,89 @@ mod tests {
         s.add_node(Story::mk_say("n1", 0.0, 0.0, None, "重复"));
         let txt = s.to_json_string_pretty();
         assert!(Story::from_json_str(&txt).is_err());
+    }
+
+    #[test]
+    fn groups_and_asset_nodes() {
+        let mut s = Story::new("作品图", "c1");
+        s.add_node(Node {
+            id: "c1".into(),
+            x: 0.0,
+            y: 0.0,
+            title: None,
+            kind: NodeKind::Character {
+                key: "yuki".into(),
+                name: "雪".into(),
+                color: Some("#7aa2f7".into()),
+                portraits: vec!["a.png".into(), "b.png".into()],
+                next: None,
+            },
+        });
+        s.add_node(Node {
+            id: "p1".into(),
+            x: 0.0,
+            y: 100.0,
+            title: None,
+            kind: NodeKind::Portrait {
+                character: Some("c1".into()),
+                asset: "assets/yuki_a.png".into(),
+                expr: Some("smile".into()),
+                next: None,
+            },
+        });
+        s.add_node(Node {
+            id: "b1".into(),
+            x: 0.0,
+            y: 200.0,
+            title: None,
+            kind: NodeKind::Background {
+                asset: "assets/store.png".into(),
+                scene: Some("便利店·夜".into()),
+                next: None,
+            },
+        });
+        let mut say = Story::mk_say("s1", 0.0, 300.0, Some("yuki"), "欢迎光临。");
+        say.set_port("cast", Some("c1".into()));
+        say.set_port("art", Some("p1".into()));
+        s.add_node(say);
+        s.groups.push(Group {
+            id: "g1".into(),
+            title: "第一章 · 雨夜".into(),
+            collapsed: true,
+            nodes: vec!["c1".into(), "p1".into(), "s1".into()],
+            color: Some("#19d1ff".into()),
+            parent: None,
+        });
+
+        // 端口：台词连到了角色与立绘
+        assert_eq!(s.node("s1").unwrap().port_target("cast"), Some("c1".into()));
+        assert_eq!(s.node("s1").unwrap().port_target("art"), Some("p1".into()));
+
+        // JSON 往返
+        let text = s.to_json_string_pretty();
+        let s2 = Story::from_json_str(&text).unwrap();
+        assert_eq!(s2.groups.len(), 1);
+        assert_eq!(s2.groups[0].title, "第一章 · 雨夜");
+        assert!(s2.groups[0].collapsed);
+        assert_eq!(s2.groups[0].nodes.len(), 3);
+        assert!(matches!(
+            s2.node("c1").unwrap().kind,
+            NodeKind::Character { .. }
+        ));
+        assert!(matches!(
+            s2.node("p1").unwrap().kind,
+            NodeKind::Portrait { .. }
+        ));
+        assert!(matches!(
+            s2.node("b1").unwrap().kind,
+            NodeKind::Background { .. }
+        ));
+        assert_eq!(s2.to_json(), s.to_json());
+
+        // lint：组里放一个不存在的方块要报错
+        let mut bad = s.clone();
+        bad.groups[0].nodes.push("ghost".into());
+        let issues = crate::lint::lint(&bad);
+        assert!(issues.iter().any(|i| i.kind == "group-dangling"));
     }
 }

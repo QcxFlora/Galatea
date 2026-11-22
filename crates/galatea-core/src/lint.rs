@@ -184,6 +184,27 @@ pub fn lint(story: &Story) -> Vec<Issue> {
             NodeKind::End { .. } => {
                 has_end_reachable_graph.insert(n.id.clone());
             }
+            NodeKind::Character { key, next, .. } => {
+                if key.trim().is_empty() {
+                    out.push(Issue {
+                        level: Level::Warning,
+                        node: Some(n.id.clone()),
+                        kind: "char-key",
+                        msg: "角色方块缺 key".into(),
+                    });
+                }
+                let _ = next;
+            }
+            NodeKind::Portrait { asset, .. } | NodeKind::Background { asset, .. } => {
+                if asset.trim().is_empty() {
+                    out.push(Issue {
+                        level: Level::Warning,
+                        node: Some(n.id.clone()),
+                        kind: "asset",
+                        msg: "资源方块没有填资源路径".into(),
+                    });
+                }
+            }
             NodeKind::Return => {}
         }
     }
@@ -206,6 +227,10 @@ pub fn lint(story: &Story) -> Vec<Issue> {
             }
         }
         for n in &story.nodes {
+            // 资源方块（角色/立绘/背景）不参与流程，不需要"可达"
+            if is_asset_kind(&n.kind) {
+                continue;
+            }
             if !seen.contains(&n.id) {
                 out.push(Issue {
                     level: Level::Warning,
@@ -283,6 +308,41 @@ pub fn lint(story: &Story) -> Vec<Issue> {
                 kind: "var-type",
                 msg: format!("变量 `{}` 的初值类型有点混乱：{:?}", name, ks),
             });
+        }
+    }
+
+    // ---- 分组 / 合并显示
+    let mut seen_in_group: BTreeMap<String, String> = BTreeMap::new();
+    for g in &story.groups {
+        for nid in &g.nodes {
+            if story.node(nid).is_none() {
+                out.push(Issue {
+                    level: Level::Error,
+                    node: Some(g.id.clone()),
+                    kind: "group-dangling",
+                    msg: format!("分组 `{}` 里包含不存在的方块 `{}`", g.title, nid),
+                });
+            }
+            if let Some(prev) = seen_in_group.get(nid) {
+                out.push(Issue {
+                    level: Level::Warning,
+                    node: Some(g.id.clone()),
+                    kind: "group-dup",
+                    msg: format!("方块 `{}` 同时属于分组 `{}` 和 `{}`", nid, prev, g.title),
+                });
+            } else {
+                seen_in_group.insert(nid.clone(), g.title.clone());
+            }
+        }
+        if let Some(p) = &g.parent {
+            if !story.groups.iter().any(|x| &x.id == p) {
+                out.push(Issue {
+                    level: Level::Error,
+                    node: Some(g.id.clone()),
+                    kind: "group-parent",
+                    msg: format!("分组 `{}` 的父分组 `{}` 不存在", g.title, p),
+                });
+            }
         }
     }
 
@@ -380,4 +440,12 @@ mod tests {
             issues
         );
     }
+}
+
+/// 资源方块：只声明素材，不进剧情流程
+pub fn is_asset_kind(kind: &NodeKind) -> bool {
+    matches!(
+        kind,
+        NodeKind::Character { .. } | NodeKind::Portrait { .. } | NodeKind::Background { .. }
+    )
 }

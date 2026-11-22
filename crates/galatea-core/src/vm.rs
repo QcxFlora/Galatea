@@ -301,6 +301,7 @@ impl Vm {
                     bg,
                     portrait,
                     next,
+                    ..
                 } => {
                     self.push_snapshot();
                     let (name, color, portrait) = self.speaker_info(&speaker, portrait);
@@ -367,6 +368,12 @@ impl Vm {
                 }
                 NodeKind::Set { effects, next } => {
                     self.apply(&effects);
+                    self.pc = next;
+                }
+                // 资源声明方块（角色/立绘/背景）：不进演出流程，直接跳过
+                NodeKind::Character { next, .. }
+                | NodeKind::Portrait { next, .. }
+                | NodeKind::Background { next, .. } => {
                     self.pc = next;
                 }
                 NodeKind::Jump { to } => {

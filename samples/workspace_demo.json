@@ -1,0 +1,106 @@
+{
+  "format": "galatea.graph/1",
+  "meta": {
+    "title": "作品图演示",
+    "author": "Galatea 示例",
+    "desc": "演示 v0.2 的方块体系：角色卡、立绘、背景、台词都成为图上的方块，并可分组合并显示。",
+    "version": "0.2.0",
+    "start": "s_open"
+  },
+  "characters": {
+    "hero": { "name": "我", "color": "#9ecbff" }
+  },
+  "vars": {
+    "aff": 0
+  },
+  "nodes": [
+    {
+      "id": "char_yuki",
+      "type": "character",
+      "x": -560,
+      "y": -160,
+      "title": "演员表 · 夏雨",
+      "key": "yuki",
+      "name": "夏雨",
+      "color": "#7aa2f7",
+      "portraits": ["assets/yuki_calm.png", "assets/yuki_smile.png"]
+    },
+    {
+      "id": "art_yuki_calm",
+      "type": "portrait",
+      "x": -820,
+      "y": 40,
+      "title": "立绘 · 平静",
+      "character": "char_yuki",
+      "asset": "assets/yuki_calm.png",
+      "expr": "calm"
+    },
+    {
+      "id": "art_yuki_smile",
+      "type": "portrait",
+      "x": -560,
+      "y": 40,
+      "title": "立绘 · 微笑",
+      "character": "char_yuki",
+      "asset": "assets/yuki_smile.png",
+      "expr": "smile"
+    },
+    {
+      "id": "bg_store",
+      "type": "background",
+      "x": -300,
+      "y": 40,
+      "title": "背景 · 便利店夜",
+      "asset": "assets/store_night.png",
+      "scene": "便利店·夜"
+    },
+    {
+      "id": "s_open",
+      "type": "say",
+      "x": 0,
+      "y": 260,
+      "title": "开场",
+      "speaker": "yuki",
+      "text": "欢迎光临。……又是你啊。",
+      "cast": "char_yuki",
+      "art": "art_yuki_calm",
+      "bg": "assets/store_night.png",
+      "next": "s_2"
+    },
+    {
+      "id": "s_2",
+      "type": "say",
+      "x": 0,
+      "y": 440,
+      "speaker": "yuki",
+      "text": "今天也这么晚。",
+      "cast": "char_yuki",
+      "art": "art_yuki_smile",
+      "next": "end_demo"
+    },
+    {
+      "id": "end_demo",
+      "type": "end",
+      "x": 0,
+      "y": 620,
+      "ending": "demo_end",
+      "text": "结局 · 这只是一张作品图的演示"
+    }
+  ],
+  "groups": [
+    {
+      "id": "g_cast",
+      "title": "演员表",
+      "collapsed": false,
+      "nodes": ["char_yuki", "art_yuki_calm", "art_yuki_smile", "bg_store"],
+      "color": "#7aa2f7"
+    },
+    {
+      "id": "g_scene",
+      "title": "第一场 · 便利店",
+      "collapsed": true,
+      "nodes": ["s_open", "s_2", "end_demo"],
+      "color": "#19d1ff"
+    }
+  ]
+}
