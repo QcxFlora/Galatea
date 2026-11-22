@@ -317,6 +317,8 @@ impl Vm {
                     let cast_key = cast.as_deref().and_then(|id| self.story.node(id)).and_then(|n| {
                         match &n.kind {
                             NodeKind::Character { key, .. } => Some(key.clone()),
+                            // 标记名方块：tag 就是剧本里引用的标识
+                            NodeKind::Marker { tag, .. } => Some(tag.clone()),
                             _ => None,
                         }
                     });
@@ -391,7 +393,9 @@ impl Vm {
                 // 资源声明方块（角色/立绘/背景）：不进演出流程，直接跳过
                 NodeKind::Character { next, .. }
                 | NodeKind::Portrait { next, .. }
-                | NodeKind::Background { next, .. } => {
+                | NodeKind::Background { next, .. }
+                | NodeKind::Marker { next, .. }
+                | NodeKind::Label { next, .. } => {
                     self.pc = next;
                 }
                 NodeKind::Jump { to } => {
@@ -503,7 +507,22 @@ impl Vm {
                         portrait.or_else(|| c.avatar.clone()),
                     );
                 }
-                // 2. v0.2 的 character 方块（按 key 或方块 id 匹配）
+                // 2. 标记名方块：顺着 next 连到的「显示名」方块取文字
+                for n in &self.story.nodes {
+                    if let NodeKind::Marker { tag, next } = &n.kind {
+                        if tag == k || &n.id == k {
+                            if let Some(lid) = next {
+                                if let Some(ln) = self.story.node(lid) {
+                                    if let NodeKind::Label { text, .. } = &ln.kind {
+                                        return (text.clone(), None, portrait);
+                                    }
+                                }
+                            }
+                            return (tag.clone(), None, portrait);
+                        }
+                    }
+                }
+                // 3. v0.2 的 character 方块（按 key 或方块 id 匹配）
                 for n in &self.story.nodes {
                     if let NodeKind::Character {
                         key,

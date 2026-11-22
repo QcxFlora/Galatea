@@ -19,6 +19,11 @@ List<String> nodePorts(StoryNode n) {
     case NodeType.say:
     case NodeType.set:
     case NodeType.script:
+    case NodeType.marker:
+    case NodeType.label:
+    case NodeType.character:
+    case NodeType.portrait:
+    case NodeType.background:
       return const ['next'];
     case NodeType.branch:
       return const ['yes', 'no'];

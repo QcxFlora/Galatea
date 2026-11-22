@@ -101,6 +101,16 @@ fn is_precompressed(name: &str) -> bool {
         .any(|ext| l.ends_with(ext))
 }
 
+/// 只算压缩后长度（给打包器比价用）
+pub fn deflate_len(data: &[u8]) -> usize {
+    deflate(data).map(|v| v.len()).unwrap_or(data.len())
+}
+
+/// 给 compact 的对比测试用
+pub fn deflate_for_test(data: &[u8]) -> Vec<u8> {
+    deflate(data).unwrap_or_default()
+}
+
 fn deflate(data: &[u8]) -> Result<Vec<u8>, String> {
     let mut e = DeflateEncoder::new(Vec::new(), Compression::new(9));
     e.write_all(data).map_err(|e| e.to_string())?;

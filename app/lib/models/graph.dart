@@ -8,7 +8,9 @@ import 'dart:convert';
 
 // ------------------------------------------------------------------ 节点类型
 
-enum NodeType { say, choice, branch, set, jump, call, ret, end, script }
+enum NodeType { say, choice, branch, set, jump, call, ret, end, script,
+  // v0.2：资源方块 + 标记名/显示名
+  character, portrait, background, marker, label }
 
 String nodeTypeId(NodeType t) {
   switch (t) {
@@ -30,6 +32,16 @@ String nodeTypeId(NodeType t) {
       return 'end';
     case NodeType.script:
       return 'script';
+    case NodeType.character:
+      return 'character';
+    case NodeType.portrait:
+      return 'portrait';
+    case NodeType.background:
+      return 'background';
+    case NodeType.marker:
+      return 'marker';
+    case NodeType.label:
+      return 'label';
   }
 }
 
@@ -51,6 +63,16 @@ NodeType nodeTypeFrom(String? s) {
       return NodeType.end;
     case 'script':
       return NodeType.script;
+    case 'character':
+      return NodeType.character;
+    case 'portrait':
+      return NodeType.portrait;
+    case 'background':
+      return NodeType.background;
+    case 'marker':
+      return NodeType.marker;
+    case 'label':
+      return NodeType.label;
     default:
       return NodeType.say;
   }
@@ -76,6 +98,16 @@ String nodeTypeLabel(NodeType t) {
       return '结局';
     case NodeType.script:
       return '脚本';
+    case NodeType.character:
+      return '角色';
+    case NodeType.portrait:
+      return '立绘';
+    case NodeType.background:
+      return '背景';
+    case NodeType.marker:
+      return '标记名';
+    case NodeType.label:
+      return '显示名';
   }
 }
 
@@ -99,6 +131,16 @@ String nodeTypeIcon(NodeType t) {
       return '🎬';
     case NodeType.script:
       return '⚙️';
+    case NodeType.character:
+      return '👤';
+    case NodeType.portrait:
+      return '🖼️';
+    case NodeType.background:
+      return '🏙️';
+    case NodeType.marker:
+      return '🏷️';
+    case NodeType.label:
+      return 'Ａ';
   }
 }
 
@@ -280,6 +322,14 @@ class StoryNode {
   String? code;
   String entry;
 
+  // v0.2 资源方块
+  String? tag; // marker：标记名
+  String? asset; // portrait/background：资源路径
+  String? character; // portrait：所属角色
+  String? expr; // portrait：表情名
+  String? scene; // background：场景名
+  List<String> portraits; // character：立绘集合
+
   StoryNode({
     required this.id,
     required this.type,
@@ -303,7 +353,14 @@ class StoryNode {
     this.src,
     this.code,
     this.entry = 'main',
-  })  : options = options ?? <Choice>[],
+    this.tag,
+    this.asset,
+    this.character,
+    this.expr,
+    this.scene,
+    List<String>? portraits,
+  })  : portraits = portraits ?? <String>[],
+        options = options ?? <Choice>[],
         effects = effects ?? <Effect>[];
 
   factory StoryNode.fromJson(Map<String, dynamic> m) {
@@ -335,6 +392,14 @@ class StoryNode {
       src: asOptString(m['src']),
       code: asOptString(m['code']),
       entry: asString(m['entry'], fallback: 'main'),
+      tag: asOptString(m['tag']) ?? asOptString(m['key']),
+      asset: asOptString(m['asset']),
+      character: asOptString(m['character']),
+      expr: asOptString(m['expr']),
+      scene: asOptString(m['scene']),
+      portraits: (m['portraits'] is List)
+          ? (m['portraits'] as List).map((e) => '$e').toList()
+          : <String>[],
     );
   }
 
@@ -386,6 +451,31 @@ class StoryNode {
         m['entry'] = entry.isEmpty ? 'main' : entry;
         if (next != null && next!.isNotEmpty) m['next'] = next;
         break;
+      case NodeType.marker:
+        m['tag'] = tag ?? id;
+        if (next != null && next!.isNotEmpty) m['next'] = next;
+        break;
+      case NodeType.label:
+        m['text'] = text;
+        if (next != null && next!.isNotEmpty) m['next'] = next;
+        break;
+      case NodeType.character:
+        m['key'] = tag ?? id;
+        m['name'] = text.isEmpty ? (title ?? '角色') : text;
+        if (portraits.isNotEmpty) m['portraits'] = portraits;
+        if (next != null && next!.isNotEmpty) m['next'] = next;
+        break;
+      case NodeType.portrait:
+        if (character != null && character!.isNotEmpty) m['character'] = character;
+        m['asset'] = asset ?? '';
+        if (expr != null && expr!.isNotEmpty) m['expr'] = expr;
+        if (next != null && next!.isNotEmpty) m['next'] = next;
+        break;
+      case NodeType.background:
+        m['asset'] = asset ?? '';
+        if (scene != null && scene!.isNotEmpty) m['scene'] = scene;
+        if (next != null && next!.isNotEmpty) m['next'] = next;
+        break;
     }
     return m;
   }
@@ -413,6 +503,12 @@ class StoryNode {
         src: src,
         code: code,
         entry: entry,
+        tag: tag,
+        asset: asset,
+        character: character,
+        expr: expr,
+        scene: scene,
+        portraits: List<String>.from(portraits),
       );
 
   /// 所有出口：(端口名, 目标节点 id)
@@ -428,6 +524,16 @@ class StoryNode {
       case NodeType.say:
       case NodeType.set:
       case NodeType.script:
+        add('next', next);
+        break;
+      case NodeType.marker:
+        // marker 的连线 = 指向「显示名」方块
+        add('label', next);
+        break;
+      case NodeType.label:
+      case NodeType.character:
+      case NodeType.portrait:
+      case NodeType.background:
         add('next', next);
         break;
       case NodeType.branch:
@@ -522,6 +628,16 @@ class StoryNode {
         return endText.isEmpty ? ending : endText;
       case NodeType.script:
         return '${src ?? '内联脚本'} → ${entry}()';
+      case NodeType.character:
+        return '角色 $title · ${portraits.length} 张立绘';
+      case NodeType.portrait:
+        return '${asset ?? '（未选图）'}${expr != null ? ' · $expr' : ''}';
+      case NodeType.background:
+        return '${asset ?? '（未选图）'}${scene != null ? ' · $scene' : ''}';
+      case NodeType.marker:
+        return '标记 ${tag ?? '（未命名）'}';
+      case NodeType.label:
+        return text.isEmpty ? '（显示名为空）' : text;
     }
   }
 
@@ -546,6 +662,16 @@ class StoryNode {
         return '结局 · $ending';
       case NodeType.script:
         return '脚本';
+      case NodeType.character:
+        return '角色';
+      case NodeType.portrait:
+        return '立绘';
+      case NodeType.background:
+        return '背景';
+      case NodeType.marker:
+        return '标记名';
+      case NodeType.label:
+        return '显示名';
     }
   }
 }

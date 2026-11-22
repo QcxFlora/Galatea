@@ -203,6 +203,67 @@ class Inspector extends StatelessWidget {
               '脚本用 Rust 安全子集（fn/let/if/while/return），内置 spring / ease / set / emit / get。',
               style: TextStyle(fontSize: 11.5, color: GColors.dim, height: 1.6)),
         ];
+      case NodeType.character:
+        return [
+          _text('角色 key（剧本里引用它）', node.tag ?? '', (v) {
+            node.tag = v.isEmpty ? null : v;
+            onChanged();
+          }, hint: 'amiya'),
+          const SizedBox(height: 10),
+          _text('显示名', node.text, (v) {
+            node.text = v;
+            onChanged();
+          }, hint: '阿米娅'),
+          const SizedBox(height: 10),
+          const Text('立绘集合由「立绘」方块通过 character 字段挂过来。',
+              style: TextStyle(fontSize: 11.5, color: GColors.dim)),
+        ];
+      case NodeType.portrait:
+        return [
+          _text('资源路径', node.asset ?? '', (v) {
+            node.asset = v.isEmpty ? null : v;
+            onChanged();
+          }, hint: 'assets/characters/amiya.webp'),
+          const SizedBox(height: 10),
+          _text('所属角色（选填）', node.character ?? '', (v) {
+            node.character = v.isEmpty ? null : v;
+            onChanged();
+          }),
+          const SizedBox(height: 10),
+          _text('表情名（选填）', node.expr ?? '', (v) {
+            node.expr = v.isEmpty ? null : v;
+            onChanged();
+          }, hint: 'smile'),
+        ];
+      case NodeType.background:
+        return [
+          _text('资源路径', node.asset ?? '', (v) {
+            node.asset = v.isEmpty ? null : v;
+            onChanged();
+          }, hint: 'assets/bg/store.webp'),
+          const SizedBox(height: 10),
+          _text('场景名（选填）', node.scene ?? '', (v) {
+            node.scene = v.isEmpty ? null : v;
+            onChanged();
+          }),
+        ];
+      case NodeType.marker:
+        return [
+          _text('标记名（剧本内部引用，不显示）', node.tag ?? '', (v) {
+            node.tag = v.isEmpty ? null : v;
+            onChanged();
+          }, hint: 'amiya'),
+          const SizedBox(height: 10),
+          const Text('从右侧圆点拖一条线到「显示名」方块，播放时就用那个名字。',
+              style: TextStyle(fontSize: 11.5, color: GColors.dim, height: 1.6)),
+        ];
+      case NodeType.label:
+        return [
+          _text('显示名（给玩家看的文字）', node.text, (v) {
+            node.text = v;
+            onChanged();
+          }, hint: '阿米娅'),
+        ];
       case NodeType.end:
         return [
           _text('结局代号', node.ending, (v) {
@@ -481,6 +542,11 @@ List<String> nodePortsOf(StoryNode n) {
     case NodeType.say:
     case NodeType.set:
     case NodeType.script:
+    case NodeType.marker:
+    case NodeType.label:
+    case NodeType.character:
+    case NodeType.portrait:
+    case NodeType.background:
       return const ['next'];
     case NodeType.branch:
       return const ['yes', 'no'];

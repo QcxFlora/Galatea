@@ -304,6 +304,14 @@ class Vm {
         case NodeType.ret:
           pc = stack.isEmpty ? null : stack.removeLast();
           break;
+        case NodeType.marker:
+        case NodeType.label:
+        case NodeType.character:
+        case NodeType.portrait:
+        case NodeType.background:
+          // 资源 / 标记方块：不进演出流程，直接跳过
+          pc = node.next;
+          break;
         case NodeType.script:
           // Dart 侧不执行 Rust 脚本（由 FFI 的 Rust VM 负责）；
           // 编辑器里跳过并留一条记录，保证图还能玩通。

@@ -53,6 +53,16 @@ class GColors {
         return const Color(0xFFFFFFFF);
       case 'script':
         return GColors.accent; // 唯一的红：外来代码一眼可见
+      case 'character':
+        return const Color(0xFFB8C4D4);
+      case 'portrait':
+        return const Color(0xFF9AA6B8);
+      case 'background':
+        return const Color(0xFF7D8A9C);
+      case 'marker':
+        return const Color(0xFFD6C48A);
+      case 'label':
+        return const Color(0xFFE8E8E8);
       default:
         return const Color(0xFF8A8A8A);
     }
@@ -79,6 +89,16 @@ class GColors {
         return 'END';
       case 'script':
         return 'SCRIPT';
+      case 'character':
+        return 'CHAR';
+      case 'portrait':
+        return 'ART';
+      case 'background':
+        return 'BG';
+      case 'marker':
+        return 'TAG';
+      case 'label':
+        return 'NAME';
       default:
         return type.toUpperCase();
     }

@@ -80,7 +80,10 @@ fn load(file: &str) -> Result<Story, String> {
     } else {
         String::from_utf8(bytes).map_err(|e| format!("{} 不是 UTF-8：{}", file, e))?
     };
-    Story::from_json_str(&src)
+    // 池化过的剧本会自动还原（普通 JSON 原样通过）
+    let doc = galatea_core::json::parse(&src)?;
+    let plain = galatea_core::compact::unpack(&doc)?;
+    Story::from_json(&plain)
 }
 
 fn cmd_lint(file: &str) -> Result<(), String> {
@@ -493,8 +496,21 @@ fn cmd_pack(story_path: &str, args: &[String]) -> Result<(), String> {
         .map_err(|e| format!("读不到 {}：{}", story_path, e))?;
     let dir = path.parent().unwrap_or_else(|| std::path::Path::new("."));
 
+    // 剧本有两条编码路线：原始 JSON / 字符串池化后再压。
+    // DEFLATE 的 LZ77 本身就会做重复串引用，预池化有时反而变大，
+    // 所以这里真的两种都压一遍，取更小的那个。
+    let pooled = galatea_core::compact::pack_str(&json).unwrap_or_else(|_| json.clone());
+    let raw_cost = gal::deflate_len(json.as_bytes());
+    let pool_cost = gal::deflate_len(pooled.as_bytes());
+    let (chosen, route) = if pool_cost < raw_cost {
+        (pooled, "池化")
+    } else {
+        (json.clone(), "原样")
+    };
+    println!("   剧本编码：{}（原样 {}B / 池化 {}B → 选 {}）", route, raw_cost, pool_cost, raw_cost.min(pool_cost));
+
     let mut files: BTreeMap<String, Vec<u8>> = BTreeMap::new();
-    files.insert("story.gala.json".to_string(), json.clone().into_bytes());
+    files.insert("story.gala.json".to_string(), chosen.into_bytes());
 
     // 资源可能在剧本目录、app/、web/ 或当前目录下，挨个找
     let candidates: Vec<std::path::PathBuf> = vec![

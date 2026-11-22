@@ -14,6 +14,7 @@
 //! 3. **一切皆节点**：台词、选择、条件、变量、跳转、子图、结局都是节点，
 //!    连线即流程，所以整部作品能被当成一张流程图审视。
 
+pub mod compact;
 pub mod expr;
 pub mod gal;
 pub mod graph;

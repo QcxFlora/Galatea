@@ -177,6 +177,18 @@ pub enum NodeKind {
     Return,
     /// 结局
     End { ending: String, text: String },
+    /// 标记名：剧本内部引用的标识（不显示给玩家），例如 `amiya`
+    /// 通过 `label` 端口连到一个「显示名」方块
+    Marker {
+        tag: String,
+        next: Option<String>,
+    },
+    /// 显示名：真正显示的文字，例如「阿米娅」
+    /// 同一个标记名可以连到不同显示名（不同场景叫法不同）
+    Label {
+        text: String,
+        next: Option<String>,
+    },
     /// 角色卡：这台机器上的「演员表」
     Character {
         key: String,
@@ -223,6 +235,8 @@ impl NodeKind {
             NodeKind::Character { .. } => "character",
             NodeKind::Portrait { .. } => "portrait",
             NodeKind::Background { .. } => "background",
+            NodeKind::Marker { .. } => "marker",
+            NodeKind::Label { .. } => "label",
         }
     }
 
@@ -240,6 +254,8 @@ impl NodeKind {
             NodeKind::Character { .. } => "#7aa2f7",
             NodeKind::Portrait { .. } => "#c3a6ff",
             NodeKind::Background { .. } => "#68d5ba",
+            NodeKind::Marker { .. } => "#ffd166",
+            NodeKind::Label { .. } => "#ffffff",
         }
     }
 }
@@ -295,7 +311,13 @@ impl Node {
             }
             NodeKind::Character { next, .. }
             | NodeKind::Portrait { next, .. }
-            | NodeKind::Background { next, .. } => {
+            | NodeKind::Background { next, .. }
+            | NodeKind::Label { next, .. } => {
+                if let Some(n) = next {
+                    v.push(("next".to_string(), n.clone()));
+                }
+            }
+            NodeKind::Marker { next, .. } => {
                 if let Some(n) = next {
                     v.push(("next".to_string(), n.clone()));
                 }
@@ -347,6 +369,8 @@ impl Node {
             (NodeKind::Character { next, .. }, "next") => *next = target,
             (NodeKind::Portrait { next, .. }, "next") => *next = target,
             (NodeKind::Background { next, .. }, "next") => *next = target,
+            (NodeKind::Label { next, .. }, "next") => *next = target,
+            (NodeKind::Marker { next, .. }, "next") => *next = target,
             (NodeKind::Set { next, .. }, "next") => *next = target,
             (NodeKind::Script { next, .. }, "next") => *next = target,
             (NodeKind::Branch { yes, .. }, "yes") => *yes = target,
@@ -555,6 +579,14 @@ impl Story {
                 if !text.is_empty() {
                     o.set("text", Json::s(text.clone()));
                 }
+            }
+            NodeKind::Marker { tag, next } => {
+                o.set("tag", Json::s(tag.clone()));
+                opt(next, "next", &mut o);
+            }
+            NodeKind::Label { text, next } => {
+                o.set("text", Json::s(text.clone()));
+                opt(next, "next", &mut o);
             }
             NodeKind::Character {
                 key,
@@ -767,6 +799,14 @@ impl Story {
                 "end" => NodeKind::End {
                     ending: nj.s_or("ending", "end"),
                     text: nj.s_or("text", ""),
+                },
+                "marker" => NodeKind::Marker {
+                    tag: nj.s_or("tag", &id),
+                    next: nj.opt_str("next").filter(|s| !s.is_empty()),
+                },
+                "label" => NodeKind::Label {
+                    text: nj.s_or("text", ""),
+                    next: nj.opt_str("next").filter(|s| !s.is_empty()),
                 },
                 "character" => NodeKind::Character {
                     key: nj.s_or("key", &id),

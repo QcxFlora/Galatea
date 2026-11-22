@@ -91,6 +91,23 @@ List<Issue> lintStory(Story story) {
           out.add(Issue(IssueLevel.error, n.id, 'dangling', '跳转目标为空'));
         }
         break;
+      case NodeType.marker:
+        if ((n.tag ?? '').trim().isEmpty) {
+          out.add(Issue(IssueLevel.warning, n.id, 'marker-tag', '标记名方块缺 tag'));
+        } else if (n.next == null || n.next!.isEmpty) {
+          out.add(Issue(IssueLevel.warning, n.id, 'marker-unlinked',
+              '标记名 `${n.tag}` 还没连到显示名'));
+        }
+        break;
+      case NodeType.label:
+        if (n.text.trim().isEmpty) {
+          out.add(Issue(IssueLevel.warning, n.id, 'label-text', '显示名方块是空的'));
+        }
+        break;
+      case NodeType.character:
+      case NodeType.portrait:
+      case NodeType.background:
+        break;
       case NodeType.end:
         endIds.add(n.id);
         break;

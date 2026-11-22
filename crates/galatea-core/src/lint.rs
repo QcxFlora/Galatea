@@ -184,6 +184,44 @@ pub fn lint(story: &Story) -> Vec<Issue> {
             NodeKind::End { .. } => {
                 has_end_reachable_graph.insert(n.id.clone());
             }
+            NodeKind::Marker { tag, next } => {
+                if tag.trim().is_empty() {
+                    out.push(Issue {
+                        level: Level::Warning,
+                        node: Some(n.id.clone()),
+                        kind: "marker-tag",
+                        msg: "标记名方块缺 tag".into(),
+                    });
+                }
+                match next.as_deref().and_then(|id| story.node(id)) {
+                    Some(ln) => {
+                        if !matches!(ln.kind, NodeKind::Label { .. }) {
+                            out.push(Issue {
+                                level: Level::Warning,
+                                node: Some(n.id.clone()),
+                                kind: "marker-target",
+                                msg: "标记名的连线应该指向一个「显示名」方块".into(),
+                            });
+                        }
+                    }
+                    None => out.push(Issue {
+                        level: Level::Warning,
+                        node: Some(n.id.clone()),
+                        kind: "marker-unlinked",
+                        msg: format!("标记名 `{}` 还没连到显示名", tag),
+                    }),
+                }
+            }
+            NodeKind::Label { text, .. } => {
+                if text.trim().is_empty() {
+                    out.push(Issue {
+                        level: Level::Warning,
+                        node: Some(n.id.clone()),
+                        kind: "label-text",
+                        msg: "显示名方块是空的".into(),
+                    });
+                }
+            }
             NodeKind::Character { key, next, .. } => {
                 if key.trim().is_empty() {
                     out.push(Issue {
@@ -446,6 +484,10 @@ mod tests {
 pub fn is_asset_kind(kind: &NodeKind) -> bool {
     matches!(
         kind,
-        NodeKind::Character { .. } | NodeKind::Portrait { .. } | NodeKind::Background { .. }
+        NodeKind::Character { .. }
+            | NodeKind::Portrait { .. }
+            | NodeKind::Background { .. }
+            | NodeKind::Marker { .. }
+            | NodeKind::Label { .. }
     )
 }
