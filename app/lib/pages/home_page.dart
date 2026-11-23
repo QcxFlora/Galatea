@@ -269,15 +269,14 @@ class _TopBar extends StatelessWidget {
                 width: 38,
                 height: 38,
                 decoration: const BoxDecoration(
-                  color: GColors.paper,
+                  color: Color(0xFF1C1C1E),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                        color: Color(0x14000000), blurRadius: 10, offset: Offset(0, 2)),
+                        color: Color(0x22000000), blurRadius: 10, offset: Offset(0, 2)),
                   ],
                 ),
-                child: const Icon(Icons.auto_stories_outlined,
-                    size: 18, color: GColors.text),
+                child: const Icon(Icons.close, size: 18, color: Colors.white),
               ),
             ),
           ),
@@ -299,6 +298,21 @@ class _TopBar extends StatelessWidget {
             ],
           ),
           const Spacer(),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('T.0.2.0',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: GColors.textStrong,
+                      letterSpacing: 1)),
+              Text('GALATEA STUDIO',
+                  style: TextStyle(
+                      fontSize: 7, color: GColors.dim, letterSpacing: 1.6)),
+            ],
+          ),
+          const SizedBox(width: 12),
           _RoundAction(icon: Icons.add, onTap: onNew, primary: true),
           const SizedBox(width: 8),
           _RoundAction(icon: Icons.folder_open, onTap: onImport),
@@ -389,9 +403,19 @@ class _RecordCard extends StatelessWidget {
         child: Container(
         height: 148,
         decoration: BoxDecoration(
-          color: GColors.paper,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF242E56), Color(0xFF19203E)],
+          ),
           borderRadius: const BorderRadius.all(Radius.circular(14)),
-          border: Border.all(color: GColors.lineLight),
+          border: Border.all(color: Colors.white.withOpacity(0.09)),
+          boxShadow: [
+            BoxShadow(
+                color: const Color(0xFF19203E).withOpacity(0.38),
+                blurRadius: 20,
+                offset: const Offset(0, 9)),
+          ],
         ),
         clipBehavior: Clip.antiAlias,
         child: Row(
@@ -425,14 +449,14 @@ class _RecordCard extends StatelessWidget {
                         padding:
                             const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                         decoration: BoxDecoration(
-                          color: GColors.accent.withOpacity(0.12),
+                          color: Colors.black.withOpacity(0.55),
                           borderRadius:
                               const BorderRadius.all(Radius.circular(20)),
                         ),
-                        child: const Text('最近记录',
+                        child: const Text('进入当前最新记录',
                             style: TextStyle(
                                 fontSize: 9,
-                                color: GColors.accent,
+                                color: Colors.white,
                                 letterSpacing: 0.8)),
                       ),
                     const Spacer(),
@@ -444,18 +468,19 @@ class _RecordCard extends StatelessWidget {
                         fontSize: 19,
                         fontWeight: FontWeight.w600,
                         height: 1.25,
-                        color: GColors.textStrong,
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(Icons.cloud_done_outlined,
-                            size: 13, color: GColors.dim),
+                        Icon(Icons.cloud_done_outlined,
+                            size: 13, color: Colors.white.withOpacity(0.5)),
                         const SizedBox(width: 5),
                         Text('云端状态：已归档 · $sizeKb KB',
-                            style: const TextStyle(
-                                fontSize: 10, color: GColors.dim)),
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.white.withOpacity(0.5))),
                       ],
                     ),
                   ],
@@ -477,28 +502,72 @@ class _RecordCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // 两道斜切色带（还原参考图的拼贴感）
+                  // 多层斜切拼贴（还原参考图2右侧的多张照片叠放）
                   Positioned(
-                    right: -20,
-                    top: -30,
-                    bottom: -30,
+                    right: -24,
+                    top: -34,
+                    bottom: -34,
                     child: Transform.rotate(
-                      angle: math.pi / 9,
+                      angle: math.pi / 8,
                       child: Container(
-                        width: 54,
-                        color: Colors.white.withOpacity(0.14),
+                        width: 62,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.16),
+                          border: Border.all(color: Colors.white.withOpacity(0.22), width: 1),
+                        ),
                       ),
                     ),
                   ),
                   Positioned(
-                    right: 44,
+                    right: 40,
                     top: -30,
                     bottom: -30,
                     child: Transform.rotate(
-                      angle: math.pi / 9,
+                      angle: math.pi / 8,
                       child: Container(
-                        width: 16,
-                        color: Colors.white.withOpacity(0.08),
+                        width: 30,
+                        color: Colors.white.withOpacity(0.10),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 78,
+                    top: -26,
+                    bottom: -26,
+                    child: Transform.rotate(
+                      angle: math.pi / 8,
+                      child: Container(
+                        width: 12,
+                        color: Colors.white.withOpacity(0.07),
+                      ),
+                    ),
+                  ),
+                  // 一张斜切的"照片"（带边框，模拟拼贴里的实拍图）
+                  Positioned(
+                    right: 18,
+                    top: 22,
+                    child: Transform.rotate(
+                      angle: -math.pi / 14,
+                      child: Container(
+                        width: 46,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 3)),
+                          ],
+                        ),
+                        child: Container(
+                          margin: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [_cover[1], _cover[0]],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -538,8 +607,8 @@ class _StatsRow extends StatelessWidget {
     final items = [
       (count.toString(), '作品'),
       ('1', '示例'),
-      ('13', '方块类型'),
-      ('37', '测试'),
+      ('18', '方块类型'),
+      ('49', '核心测试'),
     ];
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
@@ -554,6 +623,20 @@ class _StatsRow extends StatelessWidget {
           for (var i = 0; i < items.length; i++) ...[
             Column(
               children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.cloud_done_outlined,
+                        size: 9, color: GColors.dim.withOpacity(0.7)),
+                    const SizedBox(width: 3),
+                    Text('已归档',
+                        style: TextStyle(
+                            fontSize: 7.5,
+                            color: GColors.dim.withOpacity(0.7),
+                            letterSpacing: 0.5)),
+                  ],
+                ),
+                const SizedBox(height: 6),
                 Text(items[i].$1,
                     style: const TextStyle(
                         fontSize: 24,
