@@ -108,6 +108,40 @@ class Inspector extends StatelessWidget {
 
   List<Widget> _body(StoryNode node) {
     switch (node.type) {
+      case NodeType.value:
+        return [
+          _text('表达式', node.expr ?? '0', (v) {
+            node.expr = v;
+            onChanged();
+          }, hint: '值块：算出一个数，供变量块 / 加权块连线引用'),
+        ];
+      case NodeType.variable:
+        return [
+          _text('变量名', node.text, (v) {
+            node.text = v;
+            onChanged();
+          }, hint: '变量块：给这个变量累加 add 端口连进来的值'),
+          const SizedBox(height: 10),
+          _text('add 端口（值块 id，逗号分隔）', node.varAdd.join(', '), (v) {
+            node.varAdd = v.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+            onChanged();
+          }, hint: '也可在画布上从值块拖线到这里'),
+        ];
+      case NodeType.weighted:
+        return [
+          _text('提示', node.prompt, (v) {
+            node.prompt = v;
+            onChanged();
+          }),
+          const SizedBox(height: 10),
+          for (var i = 0; i < node.branches.length; i++) ...[
+            _text('分支 ${i + 1} 权重', node.branches[i].weight, (v) {
+              node.branches[i].weight = v;
+              onChanged();
+            }, hint: '权重表达式，<=0 视为不可达'),
+            const SizedBox(height: 6),
+          ],
+        ];
       case NodeType.say:
         return [
           _speakerPicker(node),
@@ -547,6 +581,9 @@ List<String> nodePortsOf(StoryNode n) {
     case NodeType.character:
     case NodeType.portrait:
     case NodeType.background:
+    case NodeType.value:
+    case NodeType.variable:
+    case NodeType.weighted:
       return const ['next'];
     case NodeType.branch:
       return const ['yes', 'no'];

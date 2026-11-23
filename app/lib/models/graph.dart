@@ -902,6 +902,8 @@ class Story {
   Map<String, Character> characters;
   Map<String, Object?> vars;
   List<StoryNode> nodes;
+  /// 支线分组（折叠成合并块的数据层；画布渲染见 PLAN）
+  List<Map<String, Object?>> groups;
 
   Story({
     this.title = '未命名',
@@ -912,9 +914,11 @@ class Story {
     Map<String, Character>? characters,
     Map<String, Object?>? vars,
     List<StoryNode>? nodes,
+    List<Map<String, Object?>>? groups,
   })  : characters = characters ?? <String, Character>{},
         vars = vars ?? <String, Object?>{},
-        nodes = nodes ?? <StoryNode>[];
+        nodes = nodes ?? <StoryNode>[],
+        groups = groups ?? <Map<String, Object?>>[];
 
   factory Story.blank(String title) {
     final s = Story(title: title);
@@ -1027,6 +1031,7 @@ class Story {
       'characters': characters.map((k, v) => MapEntry(k, v.toJson())),
       'vars': vars,
       'nodes': nodes.map((n) => n.toJson()).toList(),
+      'groups': groups,
     };
     return m;
   }
@@ -1050,6 +1055,12 @@ class Story {
         vars['$k'] = v is num || v is String || v is bool ? v : v?.toString();
       });
     }
+    final groups = <Map<String, Object?>>[];
+    if (m['groups'] is List) {
+      for (final g in (m['groups'] as List)) {
+        if (g is Map) groups.add(Map<String, Object?>.from(g));
+      }
+    }
     final nodes = <StoryNode>[];
     if (m['nodes'] is List) {
       for (final raw in (m['nodes'] as List)) {
@@ -1067,6 +1078,7 @@ class Story {
       characters: chars,
       vars: vars,
       nodes: nodes,
+      groups: groups,
     );
   }
 
@@ -1079,6 +1091,7 @@ class Story {
         characters: characters.map((k, v) => MapEntry(k, v.copy())),
         vars: Map<String, Object?>.from(vars),
         nodes: nodes.map((n) => n.copy()).toList(),
+        groups: groups.map((g) => Map<String, Object?>.from(g)).toList(),
       );
 
   /// 思维导图式自动布局：从入口往下长，兄弟横向排开，孤岛扔到一边。

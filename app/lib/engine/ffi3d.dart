@@ -132,10 +132,7 @@ class Gal3D {
       }
     }
     throw StateError(
-      '加载 galatea-3d 原生库失败。已尝试：
-${tried.join('
-')}
-'
+      '加载 galatea-3d 原生库失败。已尝试：\n${tried.join("\n")}\n'
       '修法：cargo ndk -t arm64-v8a -o android/app/src/main/jniLibs build --release -p galatea-3d',
     );
   }

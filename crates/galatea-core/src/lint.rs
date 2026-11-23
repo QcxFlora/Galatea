@@ -81,6 +81,12 @@ pub fn lint(story: &Story) -> Vec<Issue> {
         let ports = n.ports();
         for (port, target) in &ports {
             if story.node(target).is_none() {
+                // cast 端口允许直接写 characters 表的 key —— VM 明确支持这种旧剧本写法
+                // （见 vm.rs「兼容：cast 里直接写了 characters 表的 key」）。
+                // lint 不能比运行时更严，否则合法剧本会被误判成错误。
+                if port == "cast" && story.characters.contains_key(target) {
+                    continue;
+                }
                 out.push(Issue {
                     level: Level::Error,
                     node: Some(n.id.clone()),

@@ -10,6 +10,7 @@
     }
   },
   "format": "galatea.graph/1",
+  "groups": [],
   "meta": {
     "author": "Galatea 示例",
     "desc": "一个雨夜便利店的短篇。用来演示分支、条件、变量、子图与结局。",
@@ -27,18 +28,22 @@
       "y": 0
     },
     {
+      "cast": [
+        "hero"
+      ],
       "id": "n_me",
       "next": "n_welcome",
-      "speaker": "hero",
       "text": "……伞忘在教室了。",
       "type": "say",
       "x": 0,
       "y": 140
     },
     {
+      "cast": [
+        "xiayu"
+      ],
       "id": "n_welcome",
       "next": "n_choice1",
-      "speaker": "xiayu",
       "text": "欢迎光临。……啊，是你。",
       "type": "say",
       "x": 0,
@@ -70,9 +75,11 @@
       "y": 420
     },
     {
+      "cast": [
+        "xiayu"
+      ],
       "id": "n_wait",
       "next": "n_choice2",
-      "speaker": "xiayu",
       "text": "这个点还没回去？外面的伞大概要卖完了。",
       "type": "say",
       "x": -260,
@@ -97,9 +104,11 @@
       "y": 700
     },
     {
+      "cast": [
+        "xiayu"
+      ],
       "id": "n_ask",
       "next": "n_set",
-      "speaker": "xiayu",
       "text": "……明天开始，我就不在这个班了。",
       "type": "say",
       "x": -420,
@@ -130,9 +139,11 @@
       "yes": "n_truth"
     },
     {
+      "cast": [
+        "xiayu"
+      ],
       "id": "n_truth",
       "next": "n_call",
-      "speaker": "xiayu",
       "text": "我攒够学费了。夜校，读一年半。",
       "type": "say",
       "x": -580,

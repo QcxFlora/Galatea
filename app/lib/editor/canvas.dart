@@ -34,6 +34,9 @@ List<String> nodePorts(StoryNode n) {
     case NodeType.call:
       return const ['to', 'back'];
     case NodeType.ret:
+    case NodeType.value:
+    case NodeType.variable:
+    case NodeType.weighted:
     case NodeType.end:
       return const [];
   }
