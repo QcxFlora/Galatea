@@ -2,6 +2,7 @@
 /// 编辑器里的"试玩"和将来导出的独立游戏，用的都是这一套 UI + 同一个 VM。
 library;
 
+import 'package:audioplayers/audioplayers.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -24,6 +25,8 @@ class PlayerPage extends StatefulWidget {
 }
 
 class _PlayerPageState extends State<PlayerPage> {
+  final AudioPlayer _bgmPlayer = AudioPlayer();
+  final AudioPlayer _sfxPlayer = AudioPlayer();
   late Vm vm;
   VmEvent? event;
   String shown = '';
@@ -43,6 +46,8 @@ class _PlayerPageState extends State<PlayerPage> {
 
   @override
   void dispose() {
+    _bgmPlayer.dispose();
+    _sfxPlayer.dispose();
     _typer?.cancel();
     _autoTimer?.cancel();
     // 交还设计态：竖屏
@@ -56,6 +61,14 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   void _apply(VmEvent e) {
+    if (e is AudioEvent) {
+      _playAudio(e);
+      // 音频块不阻塞剧情、不替换画面，立即推进到下一节点
+      Future.microtask(() {
+        if (mounted) _advance();
+      });
+      return;
+    }
     _typer?.cancel();
     setState(() {
       event = e;
@@ -81,6 +94,16 @@ class _PlayerPageState extends State<PlayerPage> {
     } else if (e is EndingEvent) {
       setState(() => shown = e.text);
     }
+  }
+
+  void _playAudio(AudioEvent e) {
+    if (e.path.isEmpty) {
+      throw StateError('音频块 `${e.key}` 没有路径 —— 数据损坏，lint 本该拦住');
+    }
+    final player = e.kind == 'bgm' ? _bgmPlayer : _sfxPlayer;
+    player.setReleaseMode(e.looping ? ReleaseMode.loop : ReleaseMode.release);
+    player.setVolume(e.volume.clamp(0.0, 1.0));
+    player.play(AssetSource(e.path));
   }
 
   /// 台词里的 {变量} 替换成当前值

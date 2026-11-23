@@ -61,6 +61,16 @@ pub enum Event {
         /// 脚本里 emit 出来的演出指令
         emits: BTreeMap<String, Json>,
     },
+    /// 走到音频块：播放/切换音频
+    Audio {
+        node: String,
+        key: String,
+        path: String,
+        /// "bgm" | "sfx" | "voice"
+        kind: String,
+        looping: bool,
+        volume: f64,
+    },
 }
 
 impl Event {
@@ -342,6 +352,19 @@ impl Vm {
             *self.visited.entry(pc.clone()).or_insert(0) += 1;
 
             match node.kind {
+                NodeKind::Image { next, .. } => {
+                    // 图块是资源声明，走到它不产生事件，顺着 next 继续
+                    self.pc = next;
+                }
+                NodeKind::Audio { key, path, kind, looping, volume, next } => {
+                    self.push_snapshot();
+                    self.pc = next;
+                    return Event::Audio {
+                        node: pc, key, path,
+                        kind: kind.as_str().to_string(),
+                        looping, volume,
+                    };
+                }
                 NodeKind::Say {
                     text,
                     next,
@@ -357,6 +380,7 @@ impl Vm {
                         .filter_map(|id| self.story.node(id))
                         .filter_map(|n| match &n.kind {
                             NodeKind::Portrait { asset, .. } => Some(asset.clone()),
+                            NodeKind::Image { path, .. } => Some(path.clone()),
                             _ => None,
                         })
                         .collect();
@@ -405,6 +429,7 @@ impl Vm {
                     let bg_path = bg.first().and_then(|id| self.story.node(id)).and_then(|n| {
                         match &n.kind {
                             NodeKind::Background { asset, .. } => Some(asset.clone()),
+                            NodeKind::Image { path, .. } => Some(path.clone()),
                             _ => None,
                         }
                     });
@@ -839,6 +864,7 @@ fn set_path(obj: &mut Json, parts: &[&str], v: Json) {
 
 #[cfg(test)]
 mod tests {
+    use crate::graph::AudioKind;
     use super::*;
     use crate::graph::{Choice, Node, Story};
 
@@ -888,6 +914,37 @@ mod tests {
         s.node_mut("s2").unwrap().set_port("next", Some("e1".into()));
         s.node_mut("s3").unwrap().set_port("next", Some("e1".into()));
         s
+    }
+
+    #[test]
+    fn image_resolves_art_bg_and_audio_emits() {
+        let mut s = Story::new("t", "say1");
+        s.add_node(Node { id: "img".into(), x: 0.0, y: 0.0, title: None,
+            kind: NodeKind::Image { key: "k".into(), path: "assets/x.webp".into(), label: None, next: None } });
+        s.add_node(Node { id: "say1".into(), x: 0.0, y: 0.0, title: None,
+            kind: NodeKind::Say { text: "hi".into(), next: Some("aud".into()),
+                cast: vec![], art: vec!["img".into()], bg: vec!["img".into()] } });
+        s.add_node(Node { id: "aud".into(), x: 0.0, y: 0.0, title: None,
+            kind: NodeKind::Audio { key: "b".into(), path: "assets/r.ogg".into(),
+                kind: AudioKind::Bgm, looping: true, volume: 0.5, next: Some("end".into()) } });
+        s.add_node(Story::mk_end("end", 0.0, 0.0, "good", "完"));
+        let mut vm = Vm::new(s);
+        match vm.step() {
+            Event::Say { portrait, bg, .. } => {
+                assert_eq!(portrait, Some("assets/x.webp".into()), "art 连图块要解析出 path");
+                assert_eq!(bg, Some("assets/x.webp".into()), "bg 连图块要解析出 path");
+            }
+            other => panic!("期望 Say，得到 {:?}", other),
+        }
+        match vm.step() {
+            Event::Audio { path, kind, looping, volume, .. } => {
+                assert_eq!(path, "assets/r.ogg");
+                assert_eq!(kind, "bgm");
+                assert!(looping);
+                assert_eq!(volume, 0.5);
+            }
+            other => panic!("期望 Audio，得到 {:?}", other),
+        }
     }
 
     #[test]

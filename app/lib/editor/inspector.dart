@@ -108,6 +108,63 @@ class Inspector extends StatelessWidget {
 
   List<Widget> _body(StoryNode node) {
     switch (node.type) {
+      case NodeType.image:
+        return [
+          _text('资源标识 key', node.tag ?? '', (v) {
+            node.tag = v.isEmpty ? null : v;
+            onChanged();
+          }, hint: '唯一名字，供 say 的 art/bg 端口连线引用'),
+          const SizedBox(height: 10),
+          _text('图片路径', node.asset ?? '', (v) {
+            node.asset = v.isEmpty ? null : v;
+            onChanged();
+          }, hint: '.webp/.png/.jpg，相对资源根'),
+          const SizedBox(height: 10),
+          _text('显示名（可空）', node.text, (v) {
+            node.text = v;
+            onChanged();
+          }),
+        ];
+      case NodeType.audio:
+        return [
+          _text('资源标识 key', node.tag ?? '', (v) {
+            node.tag = v.isEmpty ? null : v;
+            onChanged();
+          }),
+          const SizedBox(height: 10),
+          _text('音频路径', node.asset ?? '', (v) {
+            node.asset = v.isEmpty ? null : v;
+            onChanged();
+          }, hint: '.ogg/.mp3/.wav'),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            value: node.audioKind,
+            decoration: const InputDecoration(labelText: '用途'),
+            items: const [
+              DropdownMenuItem(value: 'bgm', child: Text('BGM（循环铺底）')),
+              DropdownMenuItem(value: 'sfx', child: Text('音效（一次性）')),
+              DropdownMenuItem(value: 'voice', child: Text('配音'))
+            ],
+            onChanged: (v) {
+              node.audioKind = v ?? 'bgm';
+              node.audioLoop = v == 'bgm';
+              onChanged();
+            },
+          ),
+          const SizedBox(height: 10),
+          SwitchListTile(
+            title: const Text('循环播放'),
+            value: node.audioLoop,
+            onChanged: (v) {
+              node.audioLoop = v;
+              onChanged();
+            },
+          ),
+          _text('音量（0.0–1.0）', node.audioVolume.toString(), (v) {
+            node.audioVolume = double.tryParse(v) ?? 1.0;
+            onChanged();
+          }),
+        ];
       case NodeType.value:
         return [
           _text('表达式', node.expr ?? '0', (v) {
@@ -584,6 +641,8 @@ List<String> nodePortsOf(StoryNode n) {
     case NodeType.value:
     case NodeType.variable:
     case NodeType.weighted:
+    case NodeType.image:
+    case NodeType.audio:
       return const ['next'];
     case NodeType.branch:
       return const ['yes', 'no'];

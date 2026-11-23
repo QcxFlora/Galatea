@@ -96,6 +96,30 @@ pub fn lint(story: &Story) -> Vec<Issue> {
             }
         }
         match &n.kind {
+            NodeKind::Image { key, path, .. } => {
+                if key.trim().is_empty() {
+                    out.push(Issue { level: Level::Error, node: Some(n.id.clone()), kind: "image-key",
+                        msg: "图块缺少 key（资源标识）。怎么修：填一个唯一名字，供连线引用".into() });
+                }
+                if path.trim().is_empty() {
+                    out.push(Issue { level: Level::Error, node: Some(n.id.clone()), kind: "image-path",
+                        msg: "图块缺少 path（图片路径）。怎么修：指向 .webp/.png/.jpg 资源".into() });
+                }
+            }
+            NodeKind::Audio { key, path, volume, .. } => {
+                if key.trim().is_empty() {
+                    out.push(Issue { level: Level::Error, node: Some(n.id.clone()), kind: "audio-key",
+                        msg: "音频块缺少 key".into() });
+                }
+                if path.trim().is_empty() {
+                    out.push(Issue { level: Level::Error, node: Some(n.id.clone()), kind: "audio-path",
+                        msg: "音频块缺少 path。怎么修：指向 .ogg/.mp3/.wav 资源".into() });
+                }
+                if !(0.0..=1.0).contains(volume) {
+                    out.push(Issue { level: Level::Error, node: Some(n.id.clone()), kind: "audio-volume",
+                        msg: format!("音量 {} 超出 0.0..1.0", volume) });
+                }
+            }
             NodeKind::Say { next, .. } | NodeKind::Set { next, .. } => {
                 if next.is_none() {
                     out.push(Issue {
@@ -543,8 +567,28 @@ pub fn summary(issues: &[Issue]) -> (usize, usize, usize) {
 
 #[cfg(test)]
 mod tests {
+    use crate::graph::AudioKind;
     use super::*;
     use crate::graph::{Effect, Node, NodeKind, Op, ScriptEngine, Story};
+
+    #[test]
+    fn image_audio_validation() {
+        let mut s = Story::new("t", "a");
+        s.add_node(Node { id: "img".into(), x: 0.0, y: 0.0, title: None,
+            kind: NodeKind::Image { key: "".into(), path: "".into(), label: None, next: Some("a".into()) } });
+        s.add_node(Node { id: "aud".into(), x: 0.0, y: 0.0, title: None,
+            kind: NodeKind::Audio { key: "b".into(), path: "x.ogg".into(),
+                kind: AudioKind::Sfx, looping: false, volume: 1.5, next: Some("a".into()) } });
+        s.add_node(Story::mk_say("a", 0.0, 0.0, None, "hi"));
+        s.add_node(Story::mk_end("e", 0.0, 0.0, "g", "完"));
+        s.node_mut("a").unwrap().set_port("next", Some("e".into()));
+        let issues = lint(&s);
+        assert!(issues.iter().any(|i| i.kind == "image-key"), "缺 key 要报错");
+        assert!(issues.iter().any(|i| i.kind == "image-path"), "缺 path 要报错");
+        assert!(issues.iter().any(|i| i.kind == "audio-volume"), "音量越界要报错");
+        assert!(is_asset_kind(&NodeKind::Image { key: "k".into(), path: "p".into(), label: None, next: None }),
+            "图块是资源块");
+    }
 
     #[test]
     fn clean_story_has_no_errors() {
@@ -640,6 +684,7 @@ pub fn is_asset_kind(kind: &NodeKind) -> bool {
             | NodeKind::Portrait { .. }
             | NodeKind::Background { .. }
             | NodeKind::Label { .. }
+            | NodeKind::Image { .. }
             | NodeKind::Value { .. }
     )
 }

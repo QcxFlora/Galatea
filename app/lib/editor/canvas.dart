@@ -37,6 +37,8 @@ List<String> nodePorts(StoryNode n) {
     case NodeType.value:
     case NodeType.variable:
     case NodeType.weighted:
+    case NodeType.image:
+    case NodeType.audio:
     case NodeType.end:
       return const [];
   }

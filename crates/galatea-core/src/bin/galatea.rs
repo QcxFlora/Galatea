@@ -251,6 +251,9 @@ fn cmd_stat(file: &str) -> Result<(), String> {
             break;
         }
         match vm.step() {
+            Event::Audio { node, key, path, kind, looping, volume } => {
+                println!("🔊 {key} [{kind}] {path}  (loop={looping}, vol={volume:.2})  @{node}");
+            }
             Event::Choices { options, .. } => {
                 if vm.choose(0).is_err() {
                     break;
@@ -287,6 +290,9 @@ fn cmd_play(file: &str) -> Result<(), String> {
 
     loop {
         match vm.step() {
+            Event::Audio { node, key, path, kind, looping, volume } => {
+                println!("🔊 {key} [{kind}] {path}  (loop={looping}, vol={volume:.2})  @{node}");
+            }
             Event::Say {
                 speaker_name,
                 text,

@@ -59,6 +59,24 @@ class HaltEvent extends VmEvent {
   const HaltEvent(this.reason);
 }
 
+/// 走到音频块：播放/切换音频
+class AudioEvent extends VmEvent {
+  final String node;
+  final String key;
+  final String path;
+  final String kind; // bgm | sfx | voice
+  final bool looping;
+  final double volume;
+  const AudioEvent({
+    required this.node,
+    required this.key,
+    required this.path,
+    required this.kind,
+    required this.looping,
+    required this.volume,
+  });
+}
+
 /// 确定性随机数（xorshift64*），与 Rust 侧同算法：
 /// 同一种子 + 同样调用次数 = 同样结果，所以存档里存下 state 就能复现。
 class Rng {
@@ -283,7 +301,7 @@ class Vm {
           final artPaths = <String>[];
           for (final id in node.arts) {
             final an = story.nodeById(id);
-            if (an != null && an.type == NodeType.portrait && an.asset != null) {
+            if (an != null && (an.type == NodeType.portrait || an.type == NodeType.image) && an.asset != null) {
               artPaths.add(an.asset!);
             }
           }
@@ -320,7 +338,7 @@ class Vm {
           String? bgPath;
           if (node.bgs.isNotEmpty) {
             final bn = story.nodeById(node.bgs.first);
-            if (bn != null && bn.type == NodeType.background) bgPath = bn.asset;
+            if (bn != null && (bn.type == NodeType.background || bn.type == NodeType.image)) bgPath = bn.asset;
           }
 
           final display = names.join('、');
@@ -422,10 +440,21 @@ class Vm {
         case NodeType.label:
         case NodeType.character:
         case NodeType.portrait:
+        case NodeType.image:
         case NodeType.background:
           // 资源 / 标记方块：不进演出流程，直接跳过
           pc = node.next;
           break;
+        case NodeType.audio:
+          pc = node.next;
+          return AudioEvent(
+            node: id,
+            key: node.tag ?? '',
+            path: node.asset ?? '',
+            kind: node.audioKind,
+            looping: node.audioLoop,
+            volume: node.audioVolume,
+          );
         case NodeType.script:
           // 编辑器内不执行自定义脚本（Rust 沙箱与 GDScript 都不跑），
           // 只留一条记录，保证图还能玩通。

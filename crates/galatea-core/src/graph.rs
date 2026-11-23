@@ -277,6 +277,51 @@ pub enum NodeKind {
         entry: String,
         next: Option<String>,
     },
+    /// 图块：统一的图片资源声明，承担背景/立绘等一切图片职责。
+    /// say 的 art/bg 端口连到它，VM 取 path。一个图块可被多处引用，打包只存一份。
+    Image {
+        key: String,
+        path: String,
+        label: Option<String>,
+        next: Option<String>,
+    },
+    /// 音频块：走到它就播放/切换音频（动作块，进流程）。
+    Audio {
+        key: String,
+        path: String,
+        kind: AudioKind,
+        looping: bool,
+        volume: f64,
+        next: Option<String>,
+    },
+}
+
+/// 音频用途：BGM 循环铺底 / Sfx 一次性音效 / Voice 台词配音
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AudioKind {
+    Bgm,
+    Sfx,
+    Voice,
+}
+
+impl AudioKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AudioKind::Bgm => "bgm",
+            AudioKind::Sfx => "sfx",
+            AudioKind::Voice => "voice",
+        }
+    }
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "sfx" => AudioKind::Sfx,
+            "voice" => AudioKind::Voice,
+            _ => AudioKind::Bgm,
+        }
+    }
+    pub fn default_looping(self) -> bool {
+        matches!(self, AudioKind::Bgm)
+    }
 }
 
 impl NodeKind {
@@ -298,6 +343,8 @@ impl NodeKind {
             NodeKind::Value { .. } => "value",
             NodeKind::Variable { .. } => "variable",
             NodeKind::Weighted { .. } => "weighted",
+            NodeKind::Image { .. } => "image",
+            NodeKind::Audio { .. } => "audio",
         }
     }
 
@@ -315,6 +362,8 @@ impl NodeKind {
             NodeKind::Character { .. } => "#7aa2f7",
             NodeKind::Portrait { .. } => "#c3a6ff",
             NodeKind::Background { .. } => "#68d5ba",
+            NodeKind::Image { .. } => "#5ec8d8",
+            NodeKind::Audio { .. } => "#f7c948",
             NodeKind::Label { .. } => "#ffffff",
             NodeKind::Value { .. } => "#8fbcbb",
             NodeKind::Variable { .. } => "#a3be8c",
@@ -381,7 +430,9 @@ impl Node {
             NodeKind::Character { next, .. }
             | NodeKind::Portrait { next, .. }
             | NodeKind::Background { next, .. }
-            | NodeKind::Label { next, .. } => {
+            | NodeKind::Label { next, .. }
+            | NodeKind::Image { next, .. }
+            | NodeKind::Audio { next, .. } => {
                 if let Some(n) = next {
                     v.push(("next".to_string(), n.clone()));
                 }
@@ -471,6 +522,8 @@ impl Node {
             (NodeKind::Character { next, .. }, "next") => *next = target,
             (NodeKind::Portrait { next, .. }, "next") => *next = target,
             (NodeKind::Background { next, .. }, "next") => *next = target,
+            (NodeKind::Image { next, .. }, "next") => *next = target,
+            (NodeKind::Audio { next, .. }, "next") => *next = target,
             (NodeKind::Label { next, .. }, "next") => *next = target,
             (NodeKind::Variable { add, .. }, "add") => match target {
                 Some(t) => {
@@ -799,6 +852,20 @@ impl Story {
                 o.set("entry", Json::s(entry.clone()));
                 opt(next, "next", &mut o);
             }
+            NodeKind::Image { key, path, label, next } => {
+                o.set("key", Json::s(key.clone()));
+                o.set("path", Json::s(path.clone()));
+                opt(label, "label", &mut o);
+                opt(next, "next", &mut o);
+            }
+            NodeKind::Audio { key, path, kind, looping, volume, next } => {
+                o.set("key", Json::s(key.clone()));
+                o.set("path", Json::s(path.clone()));
+                o.set("kind", Json::s(kind.as_str()));
+                o.set("loop", Json::b(*looping));
+                o.set("volume", Json::Num(*volume));
+                opt(next, "next", &mut o);
+            }
         }
         o
     }
@@ -1027,6 +1094,23 @@ impl Story {
                     scene: nj.opt_str("scene").filter(|s| !s.is_empty()),
                     next: nj.opt_str("next").filter(|s| !s.is_empty()),
                 },
+                "image" => NodeKind::Image {
+                    key: nj.s_or("key", ""),
+                    path: nj.s_or("path", ""),
+                    label: nj.opt_str("label").filter(|s| !s.is_empty()),
+                    next: nj.opt_str("next").filter(|s| !s.is_empty()),
+                },
+                "audio" => {
+                    let kind = AudioKind::from_str(&nj.s_or("kind", "bgm"));
+                    NodeKind::Audio {
+                        key: nj.s_or("key", ""),
+                        path: nj.s_or("path", ""),
+                        kind,
+                        looping: nj.bool_or("loop", kind.default_looping()),
+                        volume: nj.num_or("volume", 1.0),
+                        next: nj.opt_str("next").filter(|s| !s.is_empty()),
+                    }
+                }
                 _ => {
                     // 端口值既接受字符串也接受字符串数组
                     let many = |key: &str| -> Vec<String> {
@@ -1165,6 +1249,25 @@ mod tests {
         s.node_mut("n3").unwrap().set_port("next", Some("e1".into()));
         s.node_mut("n4").unwrap().set_port("next", Some("e1".into()));
         s
+    }
+
+    #[test]
+    fn image_audio_json_roundtrip() {
+        let mut s = Story::new("t", "a");
+        s.add_node(Node { id: "img".into(), x: 0.0, y: 0.0, title: None,
+            kind: NodeKind::Image { key: "bg1".into(), path: "assets/bg.webp".into(),
+                label: Some("雨夜".into()), next: None } });
+        s.add_node(Node { id: "aud".into(), x: 0.0, y: 0.0, title: None,
+            kind: NodeKind::Audio { key: "bgm1".into(), path: "assets/rain.ogg".into(),
+                kind: AudioKind::Bgm, looping: true, volume: 0.8, next: Some("a".into()) } });
+        s.add_node(Story::mk_say("a", 0.0, 0.0, None, "你好"));
+        s.add_node(Story::mk_end("e", 0.0, 0.0, "good", "完"));
+        s.node_mut("a").unwrap().set_port("next", Some("e".into()));
+        let j = s.to_json();
+        let s2 = Story::from_json(&j).unwrap();
+        assert_eq!(s2.to_json(), j, "Image/Audio 往返必须无损");
+        assert!(matches!(s2.node("img").unwrap().kind, NodeKind::Image { .. }));
+        assert!(matches!(s2.node("aud").unwrap().kind, NodeKind::Audio { kind: AudioKind::Bgm, .. }));
     }
 
     #[test]

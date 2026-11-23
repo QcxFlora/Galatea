@@ -12,7 +12,7 @@ enum NodeType { say, choice, branch, set, jump, call, ret, end, script,
   // v0.2：资源方块 + 标记名/显示名
   character, portrait, background, marker, label,
   // v0.3 加权（值块 / 变量块 / 加权分支）
-  value, variable, weighted }
+  value, variable, weighted, image, audio }
 
 String nodeTypeId(NodeType t) {
   switch (t) {
@@ -50,6 +50,10 @@ String nodeTypeId(NodeType t) {
       return 'variable';
     case NodeType.weighted:
       return 'weighted';
+    case NodeType.image:
+      return 'image';
+    case NodeType.audio:
+      return 'audio';
   }
 }
 
@@ -87,6 +91,10 @@ NodeType nodeTypeFrom(String? s) {
       return NodeType.variable;
     case 'weighted':
       return NodeType.weighted;
+    case 'image':
+      return NodeType.image;
+    case 'audio':
+      return NodeType.audio;
     default:
       return NodeType.say;
   }
@@ -128,6 +136,10 @@ String nodeTypeLabel(NodeType t) {
       return '变量';
     case NodeType.weighted:
       return '加权分支';
+    case NodeType.image:
+      return '图块';
+    case NodeType.audio:
+      return '音频';
   }
 }
 
@@ -167,6 +179,10 @@ String nodeTypeIcon(NodeType t) {
       return '𝑥';
     case NodeType.weighted:
       return '🎲';
+    case NodeType.image:
+      return '🖼';
+    case NodeType.audio:
+      return '🔊';
   }
 }
 
@@ -378,6 +394,11 @@ class StoryNode {
   // 加权分支
   List<WeightedBranch> branches;
 
+  // 音频块（image 复用 tag=key / asset=path / text=label）
+  String audioKind; // bgm | sfx | voice
+  bool audioLoop;
+  double audioVolume;
+
   // 结局
   String ending;
   String endText;
@@ -431,6 +452,9 @@ class StoryNode {
     this.character,
     this.expr,
     this.scene,
+    this.audioKind = 'bgm',
+    this.audioLoop = true,
+    this.audioVolume = 1.0,
     List<String>? portraits,
   })  : portraits = portraits ?? <String>[],
         varAdd = varAdd ?? <String>[],
@@ -453,7 +477,9 @@ class StoryNode {
       // 变量块的变量名存在 name 里，其他块用 text
       text: nodeTypeFrom(m['type'] as String?) == NodeType.variable
           ? asString(m['name'])
-          : asString(m['text']),
+          : nodeTypeFrom(m['type'] as String?) == NodeType.image
+              ? asString(m['label'])
+              : asString(m['text']),
       bg: asOptString(m['bg']),
       portrait: asOptString(m['portrait']),
       next: asOptString(m['next']),
@@ -482,10 +508,13 @@ class StoryNode {
       casts: _strList(m['cast']),
       arts: _strList(m['art']),
       bgs: _strList(m['bg']),
-      asset: asOptString(m['asset']),
+      asset: asOptString(m['asset']) ?? asOptString(m['path']),
       character: asOptString(m['character']),
       expr: asOptString(m['expr']),
       scene: asOptString(m['scene']),
+      audioKind: asString(m['kind'], fallback: 'bgm'),
+      audioLoop: m['loop'] is bool ? m['loop'] as bool : asString(m['kind'], fallback: 'bgm') == 'bgm',
+      audioVolume: (m['volume'] is num) ? (m['volume'] as num).toDouble() : 1.0,
       portraits: (m['portraits'] is List)
           ? (m['portraits'] as List).map((e) => '$e').toList()
           : <String>[],
@@ -533,6 +562,20 @@ class StoryNode {
       case NodeType.weighted:
         m['prompt'] = prompt;
         m['branches'] = branches.map((b) => b.toJson()).toList();
+        break;
+      case NodeType.image:
+        m['key'] = tag ?? '';
+        m['path'] = asset ?? '';
+        if (text.isNotEmpty) m['label'] = text;
+        if (next != null && next!.isNotEmpty) m['next'] = next;
+        break;
+      case NodeType.audio:
+        m['key'] = tag ?? '';
+        m['path'] = asset ?? '';
+        m['kind'] = audioKind;
+        m['loop'] = audioLoop;
+        m['volume'] = audioVolume;
+        if (next != null && next!.isNotEmpty) m['next'] = next;
         break;
       case NodeType.jump:
         if (to != null && to!.isNotEmpty) m['to'] = to;
@@ -610,6 +653,9 @@ class StoryNode {
         tag: tag,
         varAdd: List<String>.from(varAdd),
         branches: branches.map((b) => b.copy()).toList(),
+        audioKind: audioKind,
+        audioLoop: audioLoop,
+        audioVolume: audioVolume,
         casts: List<String>.from(casts),
         arts: List<String>.from(arts),
         bgs: List<String>.from(bgs),
@@ -816,6 +862,10 @@ class StoryNode {
         return e.isEmpty ? '（空值）' : '= $e';
       case NodeType.variable:
         return varAdd.isEmpty ? '${text}（没连值块）' : '${text} ← ${varAdd.length} 个值';
+      case NodeType.image:
+        return text.isEmpty ? (asset ?? '（图块）') : '$text · ${asset ?? ''}';
+      case NodeType.audio:
+        return '${tag ?? '音频'} [${audioKind}] ${asset ?? ''}';
       case NodeType.weighted:
         if (branches.isEmpty) return '（还没有路线）';
         return branches

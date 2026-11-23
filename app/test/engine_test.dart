@@ -51,6 +51,40 @@ void main() {
   });
 
   group('VM', () {
+    test('图块/音频块 JSON 往返', () {
+      final s = Story(title: 't');
+      s.nodes.addAll([
+        StoryNode(id: 'img', type: NodeType.image, tag: 'bg1', asset: 'assets/bg.webp', text: '雨夜'),
+        StoryNode(id: 'aud', type: NodeType.audio, tag: 'bgm1', asset: 'assets/r.ogg',
+            audioKind: 'bgm', audioLoop: true, audioVolume: 0.8, next: 'a'),
+        StoryNode(id: 'a', type: NodeType.say, text: 'hi', next: 'e'),
+        StoryNode(id: 'e', type: NodeType.end, ending: 'g', endText: '完'),
+      ]);
+      final s2 = Story.fromJson(jsonDecode(jsonEncode(s.toJson())));
+      expect(s2.toJson(), s.toJson());
+      expect(s2.nodeById('img')!.type, NodeType.image);
+      expect(s2.nodeById('aud')!.audioVolume, 0.8);
+    });
+    test('图块解析 art/bg + 音频块发 AudioEvent', () {
+      final s = Story(title: 't', start: 'say1');
+      s.nodes.addAll([
+        StoryNode(id: 'img', type: NodeType.image, tag: 'k', asset: 'assets/x.webp'),
+        StoryNode(id: 'say1', type: NodeType.say, text: 'hi', next: 'aud', arts: ['img'], bgs: ['img']),
+        StoryNode(id: 'aud', type: NodeType.audio, tag: 'b', asset: 'assets/r.ogg',
+            audioKind: 'bgm', audioLoop: true, audioVolume: 0.5, next: 'end'),
+        StoryNode(id: 'end', type: NodeType.end, ending: 'g', endText: '完'),
+      ]);
+      final vm = Vm(s);
+      final e1 = vm.step();
+      expect(e1, isA<SayEvent>());
+      expect((e1 as SayEvent).portrait, 'assets/x.webp');
+      expect(e1.bg, 'assets/x.webp');
+      final e2 = vm.step();
+      expect(e2, isA<AudioEvent>());
+      expect((e2 as AudioEvent).path, 'assets/r.ogg');
+      expect(e2.kind, 'bgm');
+      expect(e2.volume, 0.5);
+    });
     test('主线流程', () {
       final vm = Vm(buildSample());
       final e1 = vm.step();
