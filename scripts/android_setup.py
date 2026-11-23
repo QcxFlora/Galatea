@@ -40,7 +40,7 @@ def main(app_dir: str) -> int:
         s = re.sub(r'applicationId\s*=\s*"[^"]*"', f'applicationId = "{APP_ID}"', s)
 
         # 用正则定位 buildTypes（不依赖缩进），在它前面插 signingConfigs
-        if "signingConfigs" not in s:
+        if not re.search(r"signingConfigs\s*\{", s):
             m = re.search(r"^(\s*)buildTypes\s*\{", s, re.M)
             if not m:
                 print("!! build.gradle.kts 里找不到 buildTypes", file=sys.stderr)
@@ -50,14 +50,19 @@ def main(app_dir: str) -> int:
                 f"{indent}signingConfigs {{\n"
                 f"{indent}    create(\"release\") {{\n"
                 f"{indent}        val propsFile = rootProject.file(\"key.properties\")\n"
-                f"{indent}        if (propsFile.exists()) {{\n"
-                f"{indent}            val props = java.util.Properties()\n"
-                f"{indent}            propsFile.inputStream().use {{ props.load(it) }}\n"
-                f"{indent}            storeFile = file(props.getProperty(\"storeFile\"))\n"
-                f"{indent}            storePassword = props.getProperty(\"storePassword\")\n"
-                f"{indent}            keyAlias = props.getProperty(\"keyAlias\")\n"
-                f"{indent}            keyPassword = props.getProperty(\"keyPassword\")\n"
+                f"{indent}        if (!propsFile.exists()) {{\n"
+                f"{indent}            throw GradleException(\"缺少 android/key.properties —— 先跑 python3 scripts/android_setup.py app\")\n"
                 f"{indent}        }}\n"
+                f"{indent}        val props = java.util.Properties()\n"
+                f"{indent}        propsFile.inputStream().use {{ props.load(it) }}\n"
+                f"{indent}        val ks = file(props.getProperty(\"storeFile\"))\n"
+                f"{indent}        if (!ks.exists()) {{\n"
+                f"{indent}            throw GradleException(\"keystore 不存在：${{ks}} —— 确认 signing/release.jks 在仓库里\")\n"
+                f"{indent}        }}\n"
+                f"{indent}        storeFile = ks\n"
+                f"{indent}        storePassword = props.getProperty(\"storePassword\")\n"
+                f"{indent}        keyAlias = props.getProperty(\"keyAlias\")\n"
+                f"{indent}        keyPassword = props.getProperty(\"keyPassword\")\n"
                 f"{indent}    }}\n"
                 f"{indent}}}\n\n"
             )
@@ -72,7 +77,7 @@ def main(app_dir: str) -> int:
         s = gradle_groovy.read_text(encoding="utf-8")
         s = re.sub(r'applicationId\s+"[^"]*"', f'applicationId "{APP_ID}"', s)
         s = re.sub(r'namespace\s+"[^"]*"', f'namespace "{APP_ID}"', s)
-        if "signingConfigs" not in s:
+        if not re.search(r"signingConfigs\s*\{", s):
             s = s.replace("    buildTypes {", '''    signingConfigs {
         release {
             def propsFile = rootProject.file('key.properties')
