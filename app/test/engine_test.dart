@@ -10,7 +10,7 @@ Story buildSample() {
   s.characters['yuki'] = Character(name: '雪', color: '#7AA2F7');
   s.vars['aff'] = 0;
   s.nodes.addAll([
-    StoryNode(id: 's1', type: NodeType.say, speaker: 'yuki', text: '早上好。', next: 'c1'),
+    StoryNode(id: 's1', type: NodeType.say, casts: ['yuki'], text: '早上好。', next: 'c1'),
     StoryNode(
       id: 'c1',
       type: NodeType.choice,
