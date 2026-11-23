@@ -540,12 +540,3 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 }
-
-Color? _parseColor(String? hex) {
-  if (hex == null || hex.isEmpty) return null;
-  var h = hex.replaceFirst('#', '');
-  if (h.length == 6) h = 'FF$h';
-  final v = int.tryParse(h, radix: 16);
-  if (v == null) return null;
-  return Color(v);
-}
