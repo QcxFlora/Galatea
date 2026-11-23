@@ -223,15 +223,8 @@ class Inspector extends StatelessWidget {
             onChanged();
           }, maxLines: 5, hint: '支持换行；{变量名} 会在播放时替换成当前值'),
           const SizedBox(height: 10),
-          _text('背景图（资源路径，可空）', node.bg ?? '', (v) {
-            node.bg = v.isEmpty ? null : v;
-            onChanged();
-          }),
-          const SizedBox(height: 10),
-          _text('立绘（资源路径，可空）', node.portrait ?? '', (v) {
-            node.portrait = v.isEmpty ? null : v;
-            onChanged();
-          }),
+          const Text('说话人 / 立绘 / 背景不再内嵌：\n从右侧 cast / art / bg 端口拖线到「角色 / 图块」，一句台词可多人同声、多人同框。',
+              style: TextStyle(fontSize: 11, color: GColors.dim, height: 1.6)),
         ];
       case NodeType.choice:
         return [

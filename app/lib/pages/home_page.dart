@@ -400,6 +400,8 @@ class _RecordCard extends StatelessWidget {
       onLongPress: onLongPress,
       child: DepthCard(
         elevation: 10,
+        onTap: onTap,
+        onLongPress: onLongPress,
         child: Container(
         height: 148,
         decoration: BoxDecoration(

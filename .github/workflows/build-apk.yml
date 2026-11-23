@@ -146,20 +146,7 @@ jobs:
         with:
           tag_name: v${{ env.VER }}
           name: Galatea ${{ env.VER }}
-          body: |
-            ## Galatea 0.1.0 先行版
-
-            思维导图式 Galgame 引擎的 Android 客户端（与 Web 先行版同源）。
-
-            **安装**：下载 `galatea-latest.apk`（最新）或 `galatea-${{ env.VER }}.apk`（此版本），
-            允许「安装未知来源应用」后安装。
-            首次启动进入首界面 → 「试玩示例」直接体验，或「新建剧本」开始画剧情图。
-
-            **功能**：思维导图编辑器（拖拽 / 连线 / 属性面板 / 实时体检 / 自动布局）、
-            播放器（打字机 / 变量插值 / 撤销 / 存读档 / 回想 / 自动模式）、
-            lilt 弹簧动画、扁平 3D 首界面。
-
-            引擎核心与 Web 版同一份 JSON 格式，剧本可在任意端打开。
+          body_path: RELEASE_NOTES.md
           files: |
             out/galatea-${{ env.VER }}.apk
             out/galatea-latest.apk

@@ -633,24 +633,26 @@ class _ToolChip extends StatelessWidget {
         message: '$icon $label',
         waitDuration: const Duration(milliseconds: 600),
         child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: GColors.panel2,
-          border: Border.all(color: GColors.line, width: 1),
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            border: Border.all(color: color.withOpacity(0.55), width: 1.2),
+            borderRadius: const BorderRadius.all(Radius.circular(10)),
+          ),
+          child: Row(
+            children: [
+              Text(icon, style: const TextStyle(fontSize: 15)),
+              const SizedBox(width: 7),
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      letterSpacing: 0.4,
+                      color: GColors.text,
+                      fontWeight: FontWeight.w700)),
+            ],
+          ),
         ),
-        child: Row(
-          children: [
-            Container(width: 2, height: 14, color: color),
-            const SizedBox(width: 8),
-            Text(label,
-                style: const TextStyle(
-                    fontSize: 11,
-                    letterSpacing: 0.6,
-                    color: GColors.text,
-                    fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ),
       ),
     );
   }
