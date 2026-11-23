@@ -93,8 +93,9 @@ def main(app_dir: str) -> int:
         print("✓ build.gradle.kts：包名 + release 签名")
     elif gradle_groovy.exists():
         s = gradle_groovy.read_text(encoding="utf-8")
-        s = re.sub(r'applicationId\s+"[^"]*"', f'applicationId "{APP_ID}"', s)
-        s = re.sub(r'namespace\s+"[^"]*"', f'namespace "{APP_ID}"', s)
+        # CI 的 flutter groovy 模板用赋值语法 applicationId = "…"，两种都要兼容
+        s = re.sub(r'applicationId\s*=?\s*"[^"]*"', f'applicationId = "{APP_ID}"', s)
+        s = re.sub(r'namespace\s*=?\s*"[^"]*"', f'namespace = "{APP_ID}"', s)
         if not re.search(r"signingConfigs\s*\{", s):
             m = re.search(r"^(\s*)buildTypes\s*\{", s, re.M)
             if not m:
