@@ -1,6 +1,7 @@
 /// 右侧/底部属性面板：选中一个节点，就在这里改它。
 library;
 
+import '../engine/capability.dart';
 import 'package:flutter/material.dart';
 
 import '../models/graph.dart';
@@ -280,19 +281,38 @@ class Inspector extends StatelessWidget {
         ];
       case NodeType.script:
         return [
-          _text('脚本路径（相对项目根）', node.src ?? '', (v) {
+          // 移动端没有 godot_script 能力 → 引擎选择器根本不渲染（不是灰掉）
+          if (can('godot_script')) ...[
+            DropdownButtonFormField<String>(
+              value: node.scriptEngine,
+              decoration: const InputDecoration(labelText: '脚本引擎'),
+              items: const [
+                DropdownMenuItem(value: 'rust', child: Text('Rust（内置沙箱，预览即所得）')),
+                DropdownMenuItem(value: 'godot', child: Text('Godot GDScript（引用外部 .gd）')),
+              ],
+              onChanged: (v) {
+                node.scriptEngine = v ?? 'rust';
+                onChanged();
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+          _text(node.scriptEngine == 'godot' ? '引用的 .gd 路径' : '脚本路径（相对项目根）',
+              node.src ?? '', (v) {
             node.src = v.isEmpty ? null : v;
             onChanged();
-          }, hint: 'scripts/intro.rs'),
+          }, hint: node.scriptEngine == 'godot' ? 'res://scripts/minigame.gd' : 'scripts/intro.rs'),
           const SizedBox(height: 10),
           _text('入口函数', node.entry, (v) {
             node.entry = v.isEmpty ? 'main' : v;
             onChanged();
-          }, hint: 'opening'),
+          }, hint: node.scriptEngine == 'godot' ? 'run' : 'opening'),
           const SizedBox(height: 10),
-          const Text(
-              '脚本用 Rust 安全子集（fn/let/if/while/return），内置 spring / ease / set / emit / get。',
-              style: TextStyle(fontSize: 11.5, color: GColors.dim, height: 1.6)),
+          Text(
+              node.scriptEngine == 'godot'
+                  ? 'Godot 引擎本体需自行安装（godotengine.org/download）。Galatea 只引用脚本，export-godot 打包成工程。'
+                  : '脚本用 Rust 安全子集（fn/let/if/while/return），内置 spring / ease / set / emit / get。',
+              style: const TextStyle(fontSize: 11.5, color: GColors.dim, height: 1.6)),
         ];
       case NodeType.character:
         return [

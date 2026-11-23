@@ -131,6 +131,10 @@ pub fn lint(story: &Story) -> Vec<Issue> {
                 }
             }
             NodeKind::Script { engine, src, entry, next, .. } => {
+                if cfg!(target_os = "android") && matches!(engine, crate::graph::ScriptEngine::Godot) {
+                    out.push(Issue { level: Level::Error, node: Some(n.id.clone()), kind: "mobile-godot",
+                        msg: "移动端引擎不支持 godot 脚本块。怎么修：在主机端（桌面）编辑，或改用 rust 引擎".into() });
+                }
                 if matches!(engine, crate::graph::ScriptEngine::Godot) {
                     match src {
                         None => out.push(Issue { level: Level::Error, node: Some(n.id.clone()),

@@ -660,6 +660,10 @@ textures/canvas_textures/default_texture_filter=1
 }
 
 fn cmd_export_godot(file: &str, args: &[String]) -> Result<(), String> {
+    if cfg!(target_os = "android") {
+        return Err("移动端引擎不支持自主打包 / 导出 Godot 工程。\n  \
+            怎么修：在主机端（桌面）运行 galatea export-godot，移动端只能编辑 / 预览 / 导入游玩".into());
+    }
     use std::path::Path;
     let opt = |keys: &[&str]| -> Option<String> {
         args.iter().position(|a| keys.contains(&a.as_str()))
