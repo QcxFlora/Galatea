@@ -357,7 +357,7 @@ class _PlayerPageState extends State<PlayerPage> {
               left: (it['x'] is num ? (it['x'] as num).toDouble() : 0),
               top: (it['y'] is num ? (it['y'] as num).toDouble() : 0),
               child: Opacity(
-                opacity: (it['opacity'] is num ? (it['opacity'] as num).toDouble() : 1).clamp(0.0, 1.0),
+                opacity: (it['opacity'] is num ? (it['opacity'] as num).toDouble() : 1).clamp(0.0, 1.0).toDouble(),
                 child: Transform.rotate(
                   angle: (it['rot'] is num ? (it['rot'] as num).toDouble() : 0) * 3.14159265 / 180,
                   child: Transform.scale(

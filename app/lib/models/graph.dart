@@ -495,7 +495,8 @@ class StoryNode {
         arts = arts ?? <String>[],
         bgs = bgs ?? <String>[],
         options = options ?? <Choice>[],
-        effects = effects ?? <Effect>[];
+        effects = effects ?? <Effect>[],
+        layoutItems = layoutItems ?? <Map<String, Object?>>[];
 
   factory StoryNode.fromJson(Map<String, dynamic> m) {
     final type = nodeTypeFrom(m['type'] as String?);
@@ -990,6 +991,10 @@ class StoryNode {
         return '图块';
       case NodeType.audio:
         return '音频';
+      case NodeType.loopBlock:
+        return '循环';
+      case NodeType.layoutBlock:
+        return '排版';
     }
   }
 }
@@ -1054,8 +1059,7 @@ class Story {
         vars = vars ?? <String, Object?>{},
         nodes = nodes ?? <StoryNode>[],
         groups = groups ?? <Map<String, Object?>>[],
-        status = status ?? <String, String>{},
-        layoutItems = layoutItems ?? <Map<String, Object?>>[];
+        status = status ?? <String, String>{};
 
   factory Story.blank(String title) {
     final s = Story(title: title);

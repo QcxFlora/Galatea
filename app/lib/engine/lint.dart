@@ -99,6 +99,19 @@ List<Issue> lintStory(Story story) {
           out.add(Issue(IssueLevel.error, n.id, 'image-path', '图块缺少图片路径'));
         }
         break;
+      case NodeType.loopBlock:
+        if (n.loopBody == null || n.loopBody!.isEmpty) {
+          out.add(Issue(IssueLevel.error, n.id, 'loop-body', '循环块没有 body 连线'));
+        }
+        if (n.loopExpr.trim().isEmpty) {
+          out.add(Issue(IssueLevel.error, n.id, 'loop-expr', '循环块缺少 expr'));
+        }
+        break;
+      case NodeType.layoutBlock:
+        if (n.layoutGroup.trim().isEmpty) {
+          out.add(Issue(IssueLevel.error, n.id, 'layout-group', '排版块没有指向组合块'));
+        }
+        break;
       case NodeType.audio:
         if ((n.tag ?? '').trim().isEmpty) {
           out.add(Issue(IssueLevel.error, n.id, 'audio-key', '音频块缺少 key'));

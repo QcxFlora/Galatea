@@ -109,6 +109,16 @@ class Inspector extends StatelessWidget {
 
   List<Widget> _body(StoryNode node) {
     switch (node.type) {
+      case NodeType.layoutBlock:
+        return [
+          _text('组合块 id', node.layoutGroup, (v) {
+            node.layoutGroup = v;
+            onChanged();
+          }),
+          const SizedBox(height: 10),
+          Text('排版元素 ${node.layoutItems.length} 个（在「组合块预览」里拖拽生成）',
+              style: const TextStyle(fontSize: 11, color: GColors.dim)),
+        ];
       case NodeType.loopBlock:
         return [
           DropdownButtonFormField<String>(
@@ -685,7 +695,10 @@ List<String> nodePortsOf(StoryNode n) {
     case NodeType.weighted:
     case NodeType.image:
     case NodeType.audio:
+    case NodeType.layoutBlock:
       return const ['next'];
+    case NodeType.loopBlock:
+      return const ['body', 'next'];
     case NodeType.branch:
       return const ['yes', 'no'];
     case NodeType.choice:
