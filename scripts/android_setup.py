@@ -120,6 +120,15 @@ def main(app_dir: str) -> int:
     if moved == 0:
         print("!! 没找到 MainActivity.kt（模板可能变了）", file=sys.stderr)
 
+    # ── 2b. AGP 9.0 默认 android.newDsl=true，会让 flutter 模板的 android {} 编译失败。
+    # 关掉新 DSL，沿用模板写法（明确固定，不靠 runner 上的 AGP 版本碰运气）。
+    gp = android / "gradle.properties"
+    txt = gp.read_text(encoding="utf-8") if gp.exists() else ""
+    if "android.newDsl" not in txt:
+        txt += "\nandroid.newDsl=false\n"
+        gp.write_text(txt, encoding="utf-8")
+        print("✓ gradle.properties：android.newDsl=false")
+
     # ── 3. key.properties
     key_props = android / "key.properties"
     repo_root = app.parent
