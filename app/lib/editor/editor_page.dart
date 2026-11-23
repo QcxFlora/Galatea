@@ -13,6 +13,7 @@ import '../platform/orientation.dart';
 import '../storage/store.dart';
 import '../theme.dart';
 import 'canvas.dart';
+import 'group_preview.dart';
 import 'inspector.dart';
 import 'meta_sheets.dart';
 
@@ -260,6 +261,10 @@ class _EditorPageState extends State<EditorPage> {
             icon: const Icon(Icons.more_vert),
             color: GColors.panel2,
             onSelected: (v) {
+              if (v == 'gpreview') {
+                GroupPreviewSheet.show(context, story, _changed);
+                return;
+              }
               switch (v) {
                 case 'layout':
                   story.autoLayout();
@@ -281,6 +286,7 @@ class _EditorPageState extends State<EditorPage> {
               }
             },
             itemBuilder: (ctx) => const [
+              PopupMenuItem(value: 'gpreview', child: Text('组合块预览 / 排版 / 手k动画')),
               PopupMenuItem(value: 'layout', child: Text('自动布局')),
               PopupMenuItem(value: 'chars', child: Text('角色管理')),
               PopupMenuItem(value: 'vars', child: Text('变量管理')),

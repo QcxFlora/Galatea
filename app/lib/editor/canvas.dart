@@ -29,6 +29,8 @@ List<String> nodePorts(StoryNode n) {
       return const ['next'];
     case NodeType.loopBlock:
       return const ['body', 'next'];
+    case NodeType.layoutBlock:
+      return const ['next'];
     case NodeType.branch:
       return const ['yes', 'no'];
     case NodeType.choice:

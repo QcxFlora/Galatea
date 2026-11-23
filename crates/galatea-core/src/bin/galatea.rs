@@ -251,6 +251,9 @@ fn cmd_stat(file: &str) -> Result<(), String> {
             break;
         }
         match vm.step() {
+            Event::Layout { node, group, items } => {
+                println!("🧩 排版 [{}] {} 个元素  @{}", group, items.as_arr().map(|a| a.len()).unwrap_or(0), node);
+            }
             Event::Audio { node, key, path, kind, looping, volume } => {
                 println!("🔊 {key} [{kind}] {path}  (loop={looping}, vol={volume:.2})  @{node}");
             }
@@ -290,6 +293,9 @@ fn cmd_play(file: &str) -> Result<(), String> {
 
     loop {
         match vm.step() {
+            Event::Layout { node, group, items } => {
+                println!("🧩 排版 [{}] {} 个元素  @{}", group, items.as_arr().map(|a| a.len()).unwrap_or(0), node);
+            }
             Event::Audio { node, key, path, kind, looping, volume } => {
                 println!("🔊 {key} [{kind}] {path}  (loop={looping}, vol={volume:.2})  @{node}");
             }

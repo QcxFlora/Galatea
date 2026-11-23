@@ -304,6 +304,25 @@ pub enum NodeKind {
         next: Option<String>,
         max_iters: u64,
     },
+    /// 排版块：组合块（group）的一次「单个渲染预览」排版结果。
+    /// items 记录组内每个节点在预览画布上的位置/缩放/透明度/旋转；
+    /// 由编辑器预览生成并连回组合块，播放器按 items 定位渲染。
+    Layout {
+        group: String,
+        items: Vec<LayoutItem>,
+        next: Option<String>,
+    },
+}
+
+/// 排版块里一个元素的位置快照
+#[derive(Debug, Clone, PartialEq)]
+pub struct LayoutItem {
+    pub node: String,
+    pub x: f64,
+    pub y: f64,
+    pub scale: f64,
+    pub opacity: f64,
+    pub rot: f64,
 }
 
 /// 音频用途：BGM 循环铺底 / Sfx 一次性音效 / Voice 台词配音
@@ -381,6 +400,7 @@ impl NodeKind {
             NodeKind::Image { .. } => "image",
             NodeKind::Audio { .. } => "audio",
             NodeKind::Loop { .. } => "loop",
+            NodeKind::Layout { .. } => "layout",
         }
     }
 
@@ -401,6 +421,7 @@ impl NodeKind {
             NodeKind::Image { .. } => "#5ec8d8",
             NodeKind::Audio { .. } => "#f7c948",
             NodeKind::Loop { .. } => "#ff9f43",
+            NodeKind::Layout { .. } => "#8ea2ff",
             NodeKind::Label { .. } => "#ffffff",
             NodeKind::Value { .. } => "#8fbcbb",
             NodeKind::Variable { .. } => "#a3be8c",
@@ -470,6 +491,11 @@ impl Node {
             | NodeKind::Label { next, .. }
             | NodeKind::Image { next, .. }
             | NodeKind::Audio { next, .. } => {
+                if let Some(n) = next {
+                    v.push(("next".to_string(), n.clone()));
+                }
+            }
+            NodeKind::Layout { next, .. } => {
                 if let Some(n) = next {
                     v.push(("next".to_string(), n.clone()));
                 }
@@ -571,6 +597,7 @@ impl Node {
             (NodeKind::Audio { next, .. }, "next") => *next = target,
             (NodeKind::Loop { body, .. }, "body") => *body = target,
             (NodeKind::Loop { next, .. }, "next") => *next = target,
+            (NodeKind::Layout { next, .. }, "next") => *next = target,
             (NodeKind::Label { next, .. }, "next") => *next = target,
             (NodeKind::Variable { add, .. }, "add") => match target {
                 Some(t) => {
@@ -972,6 +999,20 @@ impl Story {
                 o.set("volume", Json::Num(*volume));
                 opt(next, "next", &mut o);
             }
+            NodeKind::Layout { group, items, next } => {
+                o.set("group", Json::s(group.clone()));
+                o.set("items", Json::Arr(items.iter().map(|it| {
+                    let mut io = Json::obj();
+                    io.set("node", Json::s(it.node.clone()));
+                    io.set("x", Json::n(it.x));
+                    io.set("y", Json::n(it.y));
+                    io.set("scale", Json::n(it.scale));
+                    io.set("opacity", Json::n(it.opacity));
+                    io.set("rot", Json::n(it.rot));
+                    io
+                }).collect()));
+                opt(next, "next", &mut o);
+            }
             NodeKind::Loop { kind, expr, body, next, max_iters } => {
                 o.set("kind", Json::s(kind.as_str()));
                 o.set("expr", Json::s(expr.clone()));
@@ -1223,6 +1264,18 @@ impl Story {
                     key: nj.s_or("key", ""),
                     path: nj.s_or("path", ""),
                     label: nj.opt_str("label").filter(|s| !s.is_empty()),
+                    next: nj.opt_str("next").filter(|s| !s.is_empty()),
+                },
+                "layout" => NodeKind::Layout {
+                    group: nj.s_or("group", ""),
+                    items: nj.arr_or_empty("items").iter().map(|io| LayoutItem {
+                        node: io.s_or("node", ""),
+                        x: io.num_or("x", 0.0),
+                        y: io.num_or("y", 0.0),
+                        scale: io.num_or("scale", 1.0),
+                        opacity: io.num_or("opacity", 1.0),
+                        rot: io.num_or("rot", 0.0),
+                    }).collect(),
                     next: nj.opt_str("next").filter(|s| !s.is_empty()),
                 },
                 "loop" => NodeKind::Loop {

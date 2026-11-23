@@ -122,7 +122,7 @@ class _PlayerPageState extends State<PlayerPage> {
     _autoTimer = Timer(const Duration(milliseconds: 1400), () {
       if (!mounted) return;
       final e = event;
-      if (e is SayEvent) _advance();
+      if (e is SayEvent || e is LayoutEvent) _advance();
     });
   }
 
@@ -240,6 +240,7 @@ class _PlayerPageState extends State<PlayerPage> {
       body: Stack(
         children: [
           Positioned.fill(child: _background(say)),
+          if (e is LayoutEvent) Positioned.fill(child: _layoutView(e)),
           if (say?.portrait != null)
             Positioned(
               right: 24,
@@ -345,6 +346,42 @@ class _PlayerPageState extends State<PlayerPage> {
         ],
       ),
     );
+  }
+
+  Widget _layoutView(LayoutEvent e) {
+    return LayoutBuilder(builder: (ctx, box) {
+      return Stack(
+        children: [
+          for (final it in e.items)
+            Positioned(
+              left: (it['x'] is num ? (it['x'] as num).toDouble() : 0),
+              top: (it['y'] is num ? (it['y'] as num).toDouble() : 0),
+              child: Opacity(
+                opacity: (it['opacity'] is num ? (it['opacity'] as num).toDouble() : 1).clamp(0.0, 1.0),
+                child: Transform.rotate(
+                  angle: (it['rot'] is num ? (it['rot'] as num).toDouble() : 0) * 3.14159265 / 180,
+                  child: Transform.scale(
+                    scale: (it['scale'] is num ? (it['scale'] as num).toDouble() : 1),
+                    child: Container(
+                      width: 180,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: GColors.panel.withOpacity(0.92),
+                        borderRadius: const BorderRadius.all(Radius.circular(10)),
+                        border: Border.all(color: GColors.line),
+                      ),
+                      child: Text(
+                        vm.story.nodeById('${it['node']}')?.displayTitle ?? '${it['node']}',
+                        style: const TextStyle(fontSize: 12, color: GColors.text),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    });
   }
 
   Widget _background(SayEvent? say) {

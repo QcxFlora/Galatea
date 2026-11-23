@@ -96,6 +96,18 @@ pub fn lint(story: &Story) -> Vec<Issue> {
             }
         }
         match &n.kind {
+            NodeKind::Layout { group, items, .. } => {
+                if !story.groups.iter().any(|g| g.id == *group) {
+                    out.push(Issue { level: Level::Error, node: Some(n.id.clone()), kind: "layout-group",
+                        msg: format!("排版块指向不存在的组合块 `{}`", group) });
+                }
+                for it in items {
+                    if story.node(&it.node).is_none() {
+                        out.push(Issue { level: Level::Error, node: Some(n.id.clone()), kind: "layout-item",
+                            msg: format!("排版元素指向不存在的节点 `{}`", it.node) });
+                    }
+                }
+            }
             NodeKind::Loop { expr, body, max_iters, .. } => {
                 if expr.trim().is_empty() {
                     out.push(Issue { level: Level::Error, node: Some(n.id.clone()), kind: "loop-expr",

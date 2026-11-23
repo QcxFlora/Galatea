@@ -12,7 +12,7 @@ enum NodeType { say, choice, branch, set, jump, call, ret, end, script,
   // v0.2：资源方块 + 标记名/显示名
   character, portrait, background, marker, label,
   // v0.3 加权（值块 / 变量块 / 加权分支）
-  value, variable, weighted, image, audio, loopBlock }
+  value, variable, weighted, image, audio, loopBlock, layoutBlock }
 
 String nodeTypeId(NodeType t) {
   switch (t) {
@@ -56,6 +56,8 @@ String nodeTypeId(NodeType t) {
       return 'audio';
     case NodeType.loopBlock:
       return 'loop';
+    case NodeType.layoutBlock:
+      return 'layout';
   }
 }
 
@@ -99,6 +101,8 @@ NodeType nodeTypeFrom(String? s) {
       return NodeType.audio;
     case 'loop':
       return NodeType.loopBlock;
+    case 'layout':
+      return NodeType.layoutBlock;
     default:
       return NodeType.say;
   }
@@ -146,6 +150,8 @@ String nodeTypeLabel(NodeType t) {
       return '音频';
     case NodeType.loopBlock:
       return '循环';
+    case NodeType.layoutBlock:
+      return '排版';
   }
 }
 
@@ -191,6 +197,8 @@ String nodeTypeIcon(NodeType t) {
       return '🔊';
     case NodeType.loopBlock:
       return '🔁';
+    case NodeType.layoutBlock:
+      return '🧩';
   }
 }
 
@@ -402,6 +410,10 @@ class StoryNode {
   // 加权分支
   List<WeightedBranch> branches;
 
+  // 排版块
+  String layoutGroup;
+  List<Map<String, Object?>> layoutItems;
+
   // 循环块
   String loopKind; // count | while | foreach
   String loopExpr;
@@ -466,6 +478,8 @@ class StoryNode {
     this.character,
     this.expr,
     this.scene,
+    this.layoutGroup = '',
+    List<Map<String, Object?>>? layoutItems,
     this.loopKind = 'count',
     this.loopExpr = '0',
     this.loopBody,
@@ -530,6 +544,10 @@ class StoryNode {
       character: asOptString(m['character']),
       expr: asOptString(m['expr']),
       scene: asOptString(m['scene']),
+      layoutGroup: asString(m['group']),
+      layoutItems: (m['items'] is List)
+          ? (m['items'] as List).whereType<Map>().map((e) => Map<String, Object?>.from(e)).toList()
+          : <Map<String, Object?>>[],
       loopKind: asString(m['kind'], fallback: 'count'),
       loopExpr: asString(m['expr'], fallback: '0'),
       loopBody: asOptString(m['body']),
@@ -589,6 +607,11 @@ class StoryNode {
         m['key'] = tag ?? '';
         m['path'] = asset ?? '';
         if (text.isNotEmpty) m['label'] = text;
+        if (next != null && next!.isNotEmpty) m['next'] = next;
+        break;
+      case NodeType.layoutBlock:
+        m['group'] = layoutGroup;
+        m['items'] = layoutItems;
         if (next != null && next!.isNotEmpty) m['next'] = next;
         break;
       case NodeType.loopBlock:
@@ -682,6 +705,8 @@ class StoryNode {
         tag: tag,
         varAdd: List<String>.from(varAdd),
         branches: branches.map((b) => b.copy()).toList(),
+        layoutGroup: layoutGroup,
+        layoutItems: layoutItems.map((e) => Map<String, Object?>.from(e)).toList(),
         loopKind: loopKind,
         loopExpr: loopExpr,
         loopBody: loopBody,
@@ -723,6 +748,9 @@ class StoryNode {
         break;
       case NodeType.set:
       case NodeType.script:
+        add('next', next);
+        break;
+      case NodeType.layoutBlock:
         add('next', next);
         break;
       case NodeType.loopBlock:
@@ -907,6 +935,8 @@ class StoryNode {
         return varAdd.isEmpty ? '${text}（没连值块）' : '${text} ← ${varAdd.length} 个值';
       case NodeType.image:
         return text.isEmpty ? (asset ?? '（图块）') : '$text · ${asset ?? ''}';
+      case NodeType.layoutBlock:
+        return '排版 · ${layoutItems.length} 元素';
       case NodeType.loopBlock:
         return '循环 [${loopKind}] ${loopExpr}';
       case NodeType.audio:
@@ -1024,7 +1054,8 @@ class Story {
         vars = vars ?? <String, Object?>{},
         nodes = nodes ?? <StoryNode>[],
         groups = groups ?? <Map<String, Object?>>[],
-        status = status ?? <String, String>{};
+        status = status ?? <String, String>{},
+        layoutItems = layoutItems ?? <Map<String, Object?>>[];
 
   factory Story.blank(String title) {
     final s = Story(title: title);

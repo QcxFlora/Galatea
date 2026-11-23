@@ -59,6 +59,14 @@ class HaltEvent extends VmEvent {
   const HaltEvent(this.reason);
 }
 
+/// 走到排版块：按 items 定位渲染
+class LayoutEvent extends VmEvent {
+  final String node;
+  final String group;
+  final List<Map<String, Object?>> items;
+  const LayoutEvent(this.node, this.group, this.items);
+}
+
 /// 走到音频块：播放/切换音频
 class AudioEvent extends VmEvent {
   final String node;
@@ -458,6 +466,10 @@ class Vm {
           // 资源 / 标记方块：不进演出流程，直接跳过
           pc = node.next;
           break;
+        case NodeType.layoutBlock:
+          _pushSnapshot();
+          pc = node.next;
+          return LayoutEvent(id, node.layoutGroup, node.layoutItems);
         case NodeType.loopBlock:
           _pushSnapshot();
           final reentry = loops.isNotEmpty && loops.last.node == id;

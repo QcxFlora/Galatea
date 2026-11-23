@@ -61,6 +61,12 @@ pub enum Event {
         /// 脚本里 emit 出来的演出指令
         emits: BTreeMap<String, Json>,
     },
+    /// 走到排版块：按 items 定位渲染组合块的一次排版
+    Layout {
+        node: String,
+        group: String,
+        items: Json,
+    },
     /// 走到音频块：播放/切换音频
     Audio {
         node: String,
@@ -367,6 +373,21 @@ impl Vm {
                 NodeKind::Image { next, .. } => {
                     // 图块是资源声明，走到它不产生事件，顺着 next 继续
                     self.pc = next;
+                }
+                NodeKind::Layout { group, items, next } => {
+                    self.push_snapshot();
+                    self.pc = next;
+                    let arr = Json::Arr(items.iter().map(|it| {
+                        let mut io = Json::obj();
+                        io.set("node", Json::s(it.node.clone()));
+                        io.set("x", Json::n(it.x));
+                        io.set("y", Json::n(it.y));
+                        io.set("scale", Json::n(it.scale));
+                        io.set("opacity", Json::n(it.opacity));
+                        io.set("rot", Json::n(it.rot));
+                        io
+                    }).collect());
+                    return Event::Layout { node: pc, group, items: arr };
                 }
                 NodeKind::Loop { kind, expr, body, next, max_iters } => {
                     self.push_snapshot();
