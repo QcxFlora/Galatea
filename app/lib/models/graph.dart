@@ -963,6 +963,9 @@ class Story {
   /// 支线分组（折叠成合并块的数据层；画布渲染见 PLAN）
   List<Map<String, Object?>> groups;
 
+  /// 完成度：节点 id -> wip/done（缺省 todo，不存储）
+  Map<String, String> status;
+
   Story({
     this.title = '未命名',
     this.author = '',
@@ -973,10 +976,12 @@ class Story {
     Map<String, Object?>? vars,
     List<StoryNode>? nodes,
     List<Map<String, Object?>>? groups,
+    Map<String, String>? status,
   })  : characters = characters ?? <String, Character>{},
         vars = vars ?? <String, Object?>{},
         nodes = nodes ?? <StoryNode>[],
-        groups = groups ?? <Map<String, Object?>>[];
+        groups = groups ?? <Map<String, Object?>>[],
+        status = status ?? <String, String>{};
 
   factory Story.blank(String title) {
     final s = Story(title: title);
@@ -1090,6 +1095,7 @@ class Story {
       'vars': vars,
       'nodes': nodes.map((n) => n.toJson()).toList(),
       'groups': groups,
+      'status': status,
     };
     return m;
   }
@@ -1119,6 +1125,12 @@ class Story {
         if (g is Map) groups.add(Map<String, Object?>.from(g));
       }
     }
+    final status = <String, String>{};
+    if (m['status'] is Map) {
+      (m['status'] as Map).forEach((k, v) {
+        if (v == 'wip' || v == 'done') status['$k'] = v as String;
+      });
+    }
     final nodes = <StoryNode>[];
     if (m['nodes'] is List) {
       for (final raw in (m['nodes'] as List)) {
@@ -1137,6 +1149,7 @@ class Story {
       vars: vars,
       nodes: nodes,
       groups: groups,
+      status: status,
     );
   }
 
@@ -1150,7 +1163,29 @@ class Story {
         vars: Map<String, Object?>.from(vars),
         nodes: nodes.map((n) => n.copy()).toList(),
         groups: groups.map((g) => Map<String, Object?>.from(g)).toList(),
+        status: Map<String, String>.from(status),
       );
+
+  /// 完成度统计 (todo, wip, done)
+  (int, int, int) progress() {
+    var t = 0, w = 0, d = 0;
+    for (final n in nodes) {
+      switch (status[n.id] ?? 'todo') {
+        case 'done': d++;
+        case 'wip': w++;
+        default: t++;
+      }
+    }
+    return (t, w, d);
+  }
+
+  void setStatus(String id, String value) {
+    if (value == 'todo' || value.isEmpty) {
+      status.remove(id);
+    } else {
+      status[id] = value;
+    }
+  }
 
   /// 思维导图式自动布局：从入口往下长，兄弟横向排开，孤岛扔到一边。
   void autoLayout() {

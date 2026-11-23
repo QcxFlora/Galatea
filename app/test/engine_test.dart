@@ -51,6 +51,23 @@ void main() {
   });
 
   group('VM', () {
+    test('完成度标记往返 + 进度', () {
+      final s = Story(title: 't');
+      s.nodes.addAll([
+        StoryNode(id: 'a', type: NodeType.say, text: '一'),
+        StoryNode(id: 'b', type: NodeType.say, text: '二'),
+        StoryNode(id: 'e', type: NodeType.end, ending: 'g'),
+      ]);
+      s.setStatus('a', 'done');
+      s.setStatus('b', 'wip');
+      expect(s.progress(), (1, 1, 1));
+      final s2 = Story.fromJson(jsonDecode(jsonEncode(s.toJson())));
+      expect(s2.toJson(), s.toJson());
+      expect(s2.progress(), (1, 1, 1));
+      s2.setStatus('a', 'todo');
+      expect(s2.status.containsKey('a'), false);
+      expect(s2.progress(), (2, 1, 0));
+    });
     test('图块/音频块 JSON 往返', () {
       final s = Story(title: 't');
       s.nodes.addAll([

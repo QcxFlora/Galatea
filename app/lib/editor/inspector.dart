@@ -96,6 +96,20 @@ class Inspector extends StatelessWidget {
                   onChanged();
                 }),
                 const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: story.status[node.id] ?? 'todo',
+                  decoration: const InputDecoration(labelText: '完成度'),
+                  items: const [
+                    DropdownMenuItem(value: 'todo', child: Text('⬜ 待写')),
+                    DropdownMenuItem(value: 'wip', child: Text('🔧 进行中')),
+                    DropdownMenuItem(value: 'done', child: Text('✅ 完成')),
+                  ],
+                  onChanged: (v) {
+                    story.setStatus(node.id, v ?? 'todo');
+                    onChanged();
+                  },
+                ),
+                const SizedBox(height: 10),
                 ..._body(node),
                 const SizedBox(height: 12),
                 _ports(node),

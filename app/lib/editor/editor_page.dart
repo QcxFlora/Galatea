@@ -31,6 +31,7 @@ class _EditorPageState extends State<EditorPage> {
   List<Issue> issues = const [];
   Timer? _saveTimer;
   bool _dirty = false;
+  String _statusFilter = 'all';
   bool _saving = false;
 
   @override
@@ -254,6 +255,7 @@ class _EditorPageState extends State<EditorPage> {
               child: const Icon(Icons.fact_check_outlined),
             ),
           ),
+          _progressChip(),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             color: GColors.panel2,
@@ -298,6 +300,7 @@ class _EditorPageState extends State<EditorPage> {
               onSelect: (id) => setState(() => selected = id),
               onChanged: _changed,
               onToast: _toast,
+              statusFilter: _statusFilter,
             ),
           ),
           _issueBar(errors, warnings, infos),
@@ -357,6 +360,30 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
+  Widget _progressChip() {
+    final (t, w, d) = story.progress();
+    final total = story.nodes.length;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Tooltip(
+        message: '待写 $t · 进行中 $w · 完成 $d',
+        child: Text('$d/$total', style: const TextStyle(fontSize: 12, color: GColors.dim)),
+      ),
+      const SizedBox(width: 2),
+      DropdownButton<String>(
+        value: _statusFilter,
+        underline: const SizedBox(),
+        isDense: true,
+        items: const [
+          DropdownMenuItem(value: 'all', child: Text('全部', style: TextStyle(fontSize: 12))),
+          DropdownMenuItem(value: 'todo', child: Text('待写', style: TextStyle(fontSize: 12))),
+          DropdownMenuItem(value: 'wip', child: Text('进行中', style: TextStyle(fontSize: 12))),
+          DropdownMenuItem(value: 'done', child: Text('完成', style: TextStyle(fontSize: 12))),
+        ],
+        onChanged: (v) => setState(() => _statusFilter = v ?? 'all'),
+      ),
+    ]);
+  }
+
   Widget _toolbar() {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     const types = [
@@ -369,6 +396,13 @@ class _EditorPageState extends State<EditorPage> {
       NodeType.ret,
       NodeType.end,
       NodeType.script,
+      NodeType.character,
+      NodeType.label,
+      NodeType.value,
+      NodeType.variable,
+      NodeType.weighted,
+      NodeType.image,
+      NodeType.audio,
     ];
     return Container(
       color: GColors.panel,

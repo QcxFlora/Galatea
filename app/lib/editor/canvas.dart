@@ -80,6 +80,7 @@ class GraphCanvas extends StatefulWidget {
   final ValueChanged<String?> onSelect;
   final VoidCallback onChanged;
   final ValueChanged<String> onToast;
+  final String statusFilter;
 
   const GraphCanvas({
     super.key,
@@ -89,6 +90,7 @@ class GraphCanvas extends StatefulWidget {
     required this.onChanged,
     required this.onToast,
     this.playingId,
+    this.statusFilter = 'all',
   });
 
   @override
@@ -253,7 +255,9 @@ class _GraphCanvasState extends State<GraphCanvas> {
                   child: Transform.scale(
                   scale: _scale,
                   alignment: Alignment.topLeft,
-                  child: _NodeCard(
+                  child: Opacity(
+                    opacity: (widget.statusFilter != 'all' && (story.status[n.id] ?? 'todo') != widget.statusFilter) ? 0.22 : 1.0,
+                    child: _NodeCard(
                     node: n,
                     selected: widget.selectedId == n.id,
                     playing: widget.playingId == n.id,
@@ -286,6 +290,7 @@ class _GraphCanvasState extends State<GraphCanvas> {
                     onPortMove: _moveLink,
                     onPortEnd: _endLink,
                     onPortTap: (port) => _tapPort(n, port),
+                  ),
                   ),
                   ),
                 ),

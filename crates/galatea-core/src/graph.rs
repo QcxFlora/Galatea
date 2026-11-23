@@ -590,6 +590,8 @@ pub struct Story {
     pub nodes: Vec<Node>,
     /// 分组 / 合并显示
     pub groups: Vec<Group>,
+    /// 完成度标记：节点 id -> "wip"/"done"（缺省 = todo，不存储以省体积）
+    pub status: BTreeMap<String, String>,
     #[allow(dead_code)]
     index: HashMap<String, usize>,
 }
@@ -607,7 +609,30 @@ impl Story {
             vars: BTreeMap::new(),
             nodes: Vec::new(),
             groups: Vec::new(),
+            status: BTreeMap::new(),
             index: HashMap::new(),
+        }
+    }
+
+    /// 完成度统计：(todo, wip, done)，按节点数计。
+    pub fn progress(&self) -> (usize, usize, usize) {
+        let (mut t, mut w, mut d) = (0, 0, 0);
+        for n in &self.nodes {
+            match self.status.get(&n.id).map(|s| s.as_str()).unwrap_or("todo") {
+                "done" => d += 1,
+                "wip" => w += 1,
+                _ => t += 1,
+            }
+        }
+        (t, w, d)
+    }
+
+    /// 设置节点完成度；"todo" 会移除记录（省体积）。
+    pub fn set_status(&mut self, id: &str, status: &str) {
+        if status == "todo" || status.is_empty() {
+            self.status.remove(id);
+        } else {
+            self.status.insert(id.to_string(), status.to_string());
         }
     }
 
@@ -930,6 +955,13 @@ impl Story {
             groups.push(go);
         }
         root.set("groups", groups);
+        let mut st = Json::obj();
+        for (id, v) in &self.status {
+            if v != "todo" && !v.is_empty() {
+                st.set(id, Json::s(v.clone()));
+            }
+        }
+        root.set("status", st);
         root
     }
 
@@ -1160,6 +1192,15 @@ impl Story {
                 parent: gj.opt_str("parent").filter(|x| !x.is_empty()),
             });
         }
+        if let Some(Json::Obj(st)) = j.get("status") {
+            for (id, v) in st {
+                if let Json::Str(x) = v {
+                    if x == "wip" || x == "done" {
+                        s.status.insert(id.clone(), x.clone());
+                    }
+                }
+            }
+        }
         Ok(s)
     }
 
@@ -1249,6 +1290,24 @@ mod tests {
         s.node_mut("n3").unwrap().set_port("next", Some("e1".into()));
         s.node_mut("n4").unwrap().set_port("next", Some("e1".into()));
         s
+    }
+
+    #[test]
+    fn status_roundtrip_and_progress() {
+        let mut s = Story::new("t", "a");
+        s.add_node(Story::mk_say("a", 0.0, 0.0, None, "一"));
+        s.add_node(Story::mk_say("b", 0.0, 0.0, None, "二"));
+        s.add_node(Story::mk_end("e", 0.0, 0.0, "g", "完"));
+        s.set_status("a", "done");
+        s.set_status("b", "wip");
+        assert_eq!(s.progress(), (1, 1, 1));
+        let j = s.to_json();
+        let mut s2 = Story::from_json(&j).unwrap();
+        assert_eq!(s2.to_json(), j, "status 往返必须无损");
+        assert_eq!(s2.progress(), (1, 1, 1));
+        s2.set_status("a", "todo");
+        assert!(!s2.status.contains_key("a"), "todo 应移除记录");
+        assert_eq!(s2.progress(), (2, 1, 0));
     }
 
     #[test]
