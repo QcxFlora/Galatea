@@ -53,7 +53,7 @@ def main(app_dir: str) -> int:
                 f"{indent}        if (!propsFile.exists()) {{\n"
                 f"{indent}            throw GradleException(\"缺少 android/key.properties —— 先跑 python3 scripts/android_setup.py app\")\n"
                 f"{indent}        }}\n"
-                f"{indent}        val props = java.util.Properties()\n"
+                f"{indent}        val props = Properties()\n"
                 f"{indent}        propsFile.inputStream().use {{ props.load(it) }}\n"
                 f"{indent}        val ks = file(props.getProperty(\"storeFile\"))\n"
                 f"{indent}        if (!ks.exists()) {{\n"
@@ -71,6 +71,24 @@ def main(app_dir: str) -> int:
         # 用 release 签名替换模板里的 debug 签名
         s = re.sub(r'signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)',
                    'signingConfig = signingConfigs.getByName("release")', s)
+        # AGP 9.0 把旧 android {} 标成 ERROR 级弃用，newDsl=false 也救不回来。
+        # 固定到已知稳定的 AGP 8.7.3 + Gradle 8.9，不跟 runner 上的最新版碰运气。
+        if not s.lstrip().startswith("import "):
+            s = "import java.util.Properties\n\n" + s
+        settings = android / "settings.gradle.kts"
+        if settings.exists():
+            st = settings.read_text(encoding="utf-8")
+            st = re.sub(r'(id\("com\.android\.application"\) version ")[^"]+(")', r'\g<1>8.7.3\g<2>', st)
+            st = re.sub(r'(id\("com\.android\.library"\) version ")[^"]+(")', r'\g<1>8.7.3\g<2>', st)
+            st = re.sub(r'(id\("org\.jetbrains\.kotlin\.android"\) version ")[^"]+(")', r'\g<1>2.1.0\g<2>', st)
+            settings.write_text(st, encoding="utf-8")
+            print("✓ settings.gradle.kts：AGP 8.7.3 / Kotlin 2.1.0")
+        wrapper = android / "gradle" / "wrapper" / "gradle-wrapper.properties"
+        if wrapper.exists():
+            wt = wrapper.read_text(encoding="utf-8")
+            wt = re.sub(r'gradle-[0-9.]+-(bin|all)\.zip', r'gradle-8.9-\1.zip', wt)
+            wrapper.write_text(wt, encoding="utf-8")
+            print("✓ gradle-wrapper：8.9")
         gradle_kts.write_text(s, encoding="utf-8")
         print("✓ build.gradle.kts：包名 + release 签名")
     elif gradle_groovy.exists():
