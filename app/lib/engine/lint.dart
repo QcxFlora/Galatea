@@ -91,6 +91,25 @@ List<Issue> lintStory(Story story) {
           out.add(Issue(IssueLevel.error, n.id, 'dangling', '跳转目标为空'));
         }
         break;
+      case NodeType.image:
+        if ((n.tag ?? '').trim().isEmpty) {
+          out.add(Issue(IssueLevel.error, n.id, 'image-key', '图块缺少 key（资源标识）'));
+        }
+        if ((n.asset ?? '').trim().isEmpty) {
+          out.add(Issue(IssueLevel.error, n.id, 'image-path', '图块缺少图片路径'));
+        }
+        break;
+      case NodeType.audio:
+        if ((n.tag ?? '').trim().isEmpty) {
+          out.add(Issue(IssueLevel.error, n.id, 'audio-key', '音频块缺少 key'));
+        }
+        if ((n.asset ?? '').trim().isEmpty) {
+          out.add(Issue(IssueLevel.error, n.id, 'audio-path', '音频块缺少音频路径'));
+        }
+        if (n.audioVolume < 0 || n.audioVolume > 1) {
+          out.add(Issue(IssueLevel.error, n.id, 'audio-volume', '音量超出 0.0–1.0'));
+        }
+        break;
       case NodeType.variable:
         if (n.text.trim().isEmpty) {
           out.add(Issue(IssueLevel.warning, n.id, 'var-name', '变量块没有变量名'));

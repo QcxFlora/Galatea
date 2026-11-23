@@ -713,6 +713,8 @@ class StoryNode {
       case NodeType.character:
       case NodeType.portrait:
       case NodeType.background:
+      case NodeType.image:
+      case NodeType.audio:
         add('next', next);
         break;
       case NodeType.branch:
@@ -911,6 +913,10 @@ class StoryNode {
         return '变量';
       case NodeType.weighted:
         return '加权分支';
+      case NodeType.image:
+        return '图块';
+      case NodeType.audio:
+        return '音频';
     }
   }
 }

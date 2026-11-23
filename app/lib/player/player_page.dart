@@ -2,7 +2,7 @@
 /// 编辑器里的"试玩"和将来导出的独立游戏，用的都是这一套 UI + 同一个 VM。
 library;
 
-import 'package:audioplayers/audioplayers.dart';
+import 'package:audioplayers/audioplayers.dart' hide AudioEvent;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
