@@ -28,9 +28,8 @@
 /// ```
 library;
 
-import 'dart:async';
 import 'dart:ffi' as ffi;
-import 'package:ffi/ffi.dart' show malloc, calloc;
+import 'package:ffi/ffi.dart' show malloc;
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -68,8 +67,6 @@ typedef _RenderD = int Function(ffi.Pointer<ffi.Void>);
 typedef _PixC = ffi.Pointer<ffi.Uint8> Function(ffi.Pointer<ffi.Void>);
 typedef _PixD = ffi.Pointer<ffi.Uint8> Function(ffi.Pointer<ffi.Void>);
 
-typedef _Int1C = ffi.Int32 Function(ffi.Pointer<ffi.Void>);
-typedef _Int1D = int Function(ffi.Pointer<ffi.Void>);
 
 /// 轻量封装：一个引擎实例
 class Gal3D {
