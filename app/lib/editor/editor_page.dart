@@ -361,25 +361,20 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   Widget _progressChip() {
-    final (t, w, d) = story.progress();
-    final total = story.nodes.length;
+    final (d, total) = story.completion();
+    final unfinished = _statusFilter == 'unfinished';
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Tooltip(
-        message: '待写 $t · 进行中 $w · 完成 $d',
+        message: '以结尾收尾的分支 $d / 共 $total 节点',
         child: Text('$d/$total', style: const TextStyle(fontSize: 12, color: GColors.dim)),
       ),
-      const SizedBox(width: 2),
-      DropdownButton<String>(
-        value: _statusFilter,
-        underline: const SizedBox(),
-        isDense: true,
-        items: const [
-          DropdownMenuItem(value: 'all', child: Text('全部', style: TextStyle(fontSize: 12))),
-          DropdownMenuItem(value: 'todo', child: Text('待写', style: TextStyle(fontSize: 12))),
-          DropdownMenuItem(value: 'wip', child: Text('进行中', style: TextStyle(fontSize: 12))),
-          DropdownMenuItem(value: 'done', child: Text('完成', style: TextStyle(fontSize: 12))),
-        ],
-        onChanged: (v) => setState(() => _statusFilter = v ?? 'all'),
+      const SizedBox(width: 4),
+      IconButton(
+        tooltip: unfinished ? '显示全部' : '一键筛查未完成（红）',
+        visualDensity: VisualDensity.compact,
+        icon: Icon(unfinished ? Icons.filter_alt : Icons.filter_alt_outlined,
+            size: 18, color: unfinished ? GColors.err : GColors.dim),
+        onPressed: () => setState(() => _statusFilter = unfinished ? 'all' : 'unfinished'),
       ),
     ]);
   }

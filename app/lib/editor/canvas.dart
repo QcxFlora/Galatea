@@ -256,7 +256,7 @@ class _GraphCanvasState extends State<GraphCanvas> {
                   scale: _scale,
                   alignment: Alignment.topLeft,
                   child: Opacity(
-                    opacity: (widget.statusFilter != 'all' && (story.status[n.id] ?? 'todo') != widget.statusFilter) ? 0.22 : 1.0,
+                    opacity: (widget.statusFilter == 'unfinished' && !story.reachesEnd().contains(n.id)) ? 0.22 : 1.0,
                     child: _NodeCard(
                     node: n,
                     selected: widget.selectedId == n.id,
@@ -648,6 +648,7 @@ class _EdgePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final reach = story.reachesEnd();
     for (final n in story.nodes) {
       final ports = nodePorts(n);
       for (var i = 0; i < ports.length; i++) {
@@ -658,7 +659,12 @@ class _EdgePainter extends CustomPainter {
         final from = _s(portWorldPos(n, i, ports.length));
         final to = _s(entryWorldPos(target));
         final active = selectedId == n.id || selectedId == target.id;
-        _edge(canvas, from, to, portColor(ports[i]), active);
+        // 分支级完成度：流程连线能走到 End=绿，走不到=红；资源连线(cast/art/bg/add)保留端口色
+        final isResource = const {'cast', 'art', 'bg', 'add'}.contains(ports[i]);
+        final col = isResource
+            ? portColor(ports[i])
+            : (reach.contains(targetId) ? GColors.ok : GColors.err);
+        _edge(canvas, from, to, col, active);
       }
     }
     // 正在拉的线

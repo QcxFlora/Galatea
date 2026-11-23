@@ -4,7 +4,7 @@
 //! 编辑器（Flutter）只改这份模型，播放器只读这份模型，导出/导入都是同一个 JSON。
 
 use crate::json::Json;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
 pub const FORMAT: &str = "galatea.graph/1";
 
@@ -625,6 +625,40 @@ impl Story {
             }
         }
         (t, w, d)
+    }
+
+    /// 分支级完成度：能从该节点顺着连线走到某个 End 的节点集合（反向 BFS）。
+    /// 完成度不是节点手动标记，而是「这条分支是否以结尾收尾」。
+    pub fn reaches_end(&self) -> BTreeSet<String> {
+        let mut rev: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut ends: Vec<String> = Vec::new();
+        for n in &self.nodes {
+            if matches!(n.kind, NodeKind::End { .. }) {
+                ends.push(n.id.clone());
+            }
+            for (_port, t) in n.ports() {
+                rev.entry(t).or_default().push(n.id.clone());
+            }
+        }
+        let mut reach: BTreeSet<String> = ends.iter().cloned().collect();
+        let mut queue: VecDeque<String> = ends.into_iter().collect();
+        while let Some(v) = queue.pop_front() {
+            if let Some(us) = rev.get(&v) {
+                for u in us {
+                    if reach.insert(u.clone()) {
+                        queue.push_back(u.clone());
+                    }
+                }
+            }
+        }
+        reach
+    }
+
+    /// (以结尾收尾的节点数, 总节点数)
+    pub fn completion(&self) -> (usize, usize) {
+        let reach = self.reaches_end();
+        let done = self.nodes.iter().filter(|n| reach.contains(&n.id)).count();
+        (done, self.nodes.len())
     }
 
     /// 设置节点完成度；"todo" 会移除记录（省体积）。
@@ -1295,6 +1329,22 @@ mod tests {
         s.node_mut("n3").unwrap().set_port("next", Some("e1".into()));
         s.node_mut("n4").unwrap().set_port("next", Some("e1".into()));
         s
+    }
+
+    #[test]
+    fn branch_completion_via_reaches_end() {
+        let mut s = Story::new("t", "a");
+        s.add_node(Story::mk_say("a", 0.0, 0.0, None, "起"));
+        s.add_node(Story::mk_say("good", 0.0, 0.0, None, "好"));
+        s.add_node(Story::mk_say("dead", 0.0, 0.0, None, "断头"));
+        s.add_node(Story::mk_end("e", 0.0, 0.0, "g", "完"));
+        s.node_mut("a").unwrap().set_port("next", Some("good".into()));
+        s.node_mut("good").unwrap().set_port("next", Some("e".into()));
+        // dead 没有出口 → 走不到 End
+        let reach = s.reaches_end();
+        assert!(reach.contains("a") && reach.contains("good") && reach.contains("e"));
+        assert!(!reach.contains("dead"), "断头分支不算完成");
+        assert_eq!(s.completion(), (3, 4));
     }
 
     #[test]

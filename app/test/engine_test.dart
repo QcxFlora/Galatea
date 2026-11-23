@@ -51,6 +51,20 @@ void main() {
   });
 
   group('VM', () {
+    test('分支完成度: 断头分支不算完成', () {
+      final s = Story(title: 't', start: 'a');
+      s.nodes.addAll([
+        StoryNode(id: 'a', type: NodeType.say, text: '起', next: 'good'),
+        StoryNode(id: 'good', type: NodeType.say, text: '好', next: 'e'),
+        StoryNode(id: 'dead', type: NodeType.say, text: '断'),
+        StoryNode(id: 'e', type: NodeType.end, ending: 'g'),
+      ]);
+      final r = s.reachesEnd();
+      expect(r.contains('a'), true);
+      expect(r.contains('good'), true);
+      expect(r.contains('dead'), false);
+      expect(s.completion(), (3, 4));
+    });
     test('完成度标记往返 + 进度', () {
       final s = Story(title: 't');
       s.nodes.addAll([

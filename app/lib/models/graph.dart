@@ -1179,6 +1179,34 @@ class Story {
     return (t, w, d);
   }
 
+  /// 分支级完成度：能顺着连线走到 End 的节点集合（反向 BFS）。
+  Set<String> reachesEnd() {
+    final rev = <String, List<String>>{};
+    final ends = <String>[];
+    for (final n in nodes) {
+      if (n.type == NodeType.end) ends.add(n.id);
+      for (final e in n.ports()) {
+        rev.putIfAbsent(e.value, () => <String>[]).add(n.id);
+      }
+    }
+    final reach = <String>{...ends};
+    final queue = <String>[...ends];
+    while (queue.isNotEmpty) {
+      final v = queue.removeLast();
+      for (final u in rev[v] ?? const <String>[]) {
+        if (reach.add(u)) queue.add(u);
+      }
+    }
+    return reach;
+  }
+
+  /// (以结尾收尾的节点数, 总节点数)
+  (int, int) completion() {
+    final r = reachesEnd();
+    final done = nodes.where((n) => r.contains(n.id)).length;
+    return (done, nodes.length);
+  }
+
   void setStatus(String id, String value) {
     if (value == 'todo' || value.isEmpty) {
       status.remove(id);
