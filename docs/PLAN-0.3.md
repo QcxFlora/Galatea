@@ -9,11 +9,11 @@
 
 | # | 事项 | 状态 | 验收标准 |
 |---|---|---|---|
-| L1 | APK 构建 | 🔧 根因=最新Flutter要Gradle9.3.1与AGP8.x互斥；已固定Flutter3.24.5+AGP8.7.3+Gradle8.9，`bde5fae`验证中 | Release 出现 arm64 包，签名指纹不变，包名 com.galatea.studio |
+| L1 | APK 构建 | 🔧 已出 arm64 包但**签名/包名错**：CI groovy 模板用赋值语法 `applicationId =`/`signingConfig =`，旧正则只匹配调用语法→替换落空→debug 钥匙+旧包名。已兼容 `=` + 改完自检 + CI 指纹硬校验，`c611f99` 验证中 | Release 包指纹=DC:69…、包名 com.galatea.studio、仅 arm64 |
 | L2 | Godot GDScript 运行时真机验证 | ⬜ sandbox 无 Godot SDK | 用 Godot 4.2+ 打开导出工程，F5 能播完 demo.gal |
-| L3 | 书柜视觉对照参考图 | ⬜ 见第四节 | 深色卡片浮浅底 + 黑胶囊 + 圆底座 + 线稿图标 |
+| L3 | 书柜视觉对照参考图 | ✅ `bde5fae` 深色记录卡+黑胶囊+多层斜切拼贴+统计条状态行+黑圆底X+编号 | 深色卡片浮浅底 + 黑胶囊 + 圆底座 + 线稿图标 |
 | L4 | 支线折叠渲染 | ⬜ groups 数据层已通，画布不画合并块 | 折叠组在画布渲染成一个合并方块，可展开 |
-| L5 | 完成度标记 | ⬜ 数据层都没有 | 节点 todo/wip/done + 过滤 + 进度统计 |
+| L5 | 完成度标记 | ✅ `18d8498` Rust/Dart status 映射+progress+inspector 选择+画布过滤调光+顶栏进度，双端测试 | 节点 todo/wip/done + 过滤 + 进度统计 |
 | L6 | MCP 接口 | ⬜ | galatea-mcp 暴露 12 工具，可被 AI 客户端调用 |
 | L7 | Web 版同步 | ⬜ 浅色/3D/新方块未同步 | web/index.html 与 Flutter 端视觉/方块一致 |
 | L8 | 编辑器新方块 UI | 🔧 inspector 面板已补，多值端口可视化未做 | 画布上 cast/art/bg/add 多端口可见可拖 |
@@ -218,3 +218,30 @@ D 把引擎本身改成「闭源需授权」的自定义许可 → 引擎**不�
 7. ⬜ 全量测试 + CI 绿 + APK 出包 + 按格式汇报
 
 > 每完成一项，回本文件把 ⬜ 改 ✅ 并附验证记录。不做完不勾。
+
+---
+
+## 八、签名事故复盘（v0.2.0.35 错签包）
+
+**现象**：APK 构建成功但指纹=31:DF…（debug 钥匙）、包名=dev.galatea.galatea_studio（旧）。
+若发布，用户覆盖安装会失败/丢数据 —— 违反「签名最不能动」。
+
+**根因**：CI 上 Flutter 3.24.5 生成的 `android/app/build.gradle` 虽叫 groovy 文件名，
+内容却用**赋值语法**：`applicationId = "…"`、`signingConfig = signingConfigs.debug`。
+android_setup.py 的 groovy 分支正则只匹配**调用语法**（`applicationId "…"`、
+`signingConfig signingConfigs.debug`），于是包名替换与 release 签名替换**全部落空**，
+release 仍用 debug 钥匙、包名仍是 create 时的 --org dev.galatea。
+
+**为什么之前没发现**：本地样张用的是调用语法模板，与 CI 真实模板不一致；
+且旧 groovy 分支有 `if (propsFile.exists())` 静默降级，掩盖了问题。
+
+**修复**：
+1. groovy 正则兼容 `=`（`applicationId\s*=?\s*"…"`、`signingConfig\s*=?\s*signingConfigs\.debug`）。
+2. 去掉静默降级：key.properties/keystore 缺失直接 throw GradleException。
+3. **改完自检**：读回真实 gradle，打印 applicationId/namespace/signingConfig/storeFile，
+   包名或 release 签名没接上立刻 return 1（构建前就失败，不浪费 6 分钟）。
+4. **CI 硬校验**：构建后用 keytool 比对指纹必须=DC:69…，并断言仅 arm64-v8a、
+   包名=com.galatea.studio，不符即 job 失败，绝不发布错签包。
+
+**教训**：样张必须还原 CI 真实模板形态；任何「改造」都要读回自检；
+签名/包名这类不可逆项要在 CI 里硬断言，而不是相信脚本打印的 ✓。
