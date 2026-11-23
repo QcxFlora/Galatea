@@ -4,7 +4,7 @@
 //! 编辑器内嵌的试玩、独立播放器、以及导出的可执行游戏，跑的都是同一个 VM。
 
 use crate::expr;
-use crate::graph::{Effect, NodeKind, Op, Story};
+use crate::graph::{Effect, NodeKind, Op, Story, LoopKind};
 use crate::json::Json;
 use crate::script::{Script, Value as ScriptValue};
 use std::collections::{BTreeMap, BTreeSet};
@@ -124,8 +124,15 @@ struct Pending {
 }
 
 #[derive(Debug, Clone)]
+struct LoopFrame {
+    node: String,
+    iter: u64,
+}
+
+#[derive(Debug, Clone)]
 struct Snapshot {
     pc: Option<String>,
+    loops: Vec<LoopFrame>,
     vars: BTreeMap<String, Json>,
     stack: Vec<Option<String>>,
     visited: BTreeMap<String, u32>,
@@ -149,6 +156,8 @@ pub struct Vm {
     pending: Option<Pending>,
     pub ended: Option<(String, String)>,
     snapshots: Vec<Snapshot>,
+    /// 循环帧栈（body 尾连回循环块 = 重入迭代）；进快照/存档保证撤销一致
+    loops: Vec<LoopFrame>,
     /// 本次运行中自动执行的节点数（用于诊断）
     pub auto_steps: u32,
     /// 加权分支用的随机数（状态会存档）
@@ -178,6 +187,7 @@ impl Vm {
             pending: None,
             ended: None,
             snapshots: Vec::new(),
+            loops: Vec::new(),
             auto_steps: 0,
             rng: Rng::new(time_seed()),
             scripts: BTreeMap::new(),
@@ -284,6 +294,7 @@ impl Vm {
         }
         self.snapshots.push(Snapshot {
             pc: self.pc.clone(),
+            loops: self.loops.clone(),
             vars: self.vars.clone(),
             stack: self.stack.clone(),
             visited: self.visited.clone(),
@@ -306,6 +317,7 @@ impl Vm {
         match self.snapshots.pop() {
             Some(s) => {
                 self.pc = s.pc;
+                self.loops = s.loops;
                 self.vars = s.vars;
                 self.stack = s.stack;
                 self.visited = s.visited;
@@ -355,6 +367,49 @@ impl Vm {
                 NodeKind::Image { next, .. } => {
                     // 图块是资源声明，走到它不产生事件，顺着 next 继续
                     self.pc = next;
+                }
+                NodeKind::Loop { kind, expr, body, next, max_iters } => {
+                    self.push_snapshot();
+                    // 重入（子图尾连回本块）= 下一次迭代；否则开新帧
+                    let reentry = self.loops.last().map(|f| f.node == pc).unwrap_or(false);
+                    if reentry {
+                        self.loops.last_mut().unwrap().iter += 1;
+                    } else {
+                        self.loops.push(LoopFrame { node: pc.clone(), iter: 0 });
+                    }
+                    let iter = self.loops.last().unwrap().iter;
+                    let cont = match kind {
+                        LoopKind::Count => {
+                            iter < self.eval_expr(&expr).ok().and_then(|v| v.as_f64()).unwrap_or(0.0) as u64
+                        }
+                        LoopKind::While => self.eval_cond(&expr),
+                        LoopKind::ForEach => {
+                            let len = self.vars.get(&expr).and_then(|v| v.as_arr()).map(|a| a.len()).unwrap_or(0);
+                            iter < len as u64
+                        }
+                    };
+                    if iter >= max_iters {
+                        self.log.push(format!("循环 {} 达到上限 {}，强制退出", pc, max_iters));
+                        self.loops.pop();
+                        self.pc = next;
+                    } else if cont {
+                        self.vars.insert("loop_index".to_string(), Json::n(iter as f64));
+                        if matches!(kind, LoopKind::ForEach) {
+                            if let Some(item) = self.vars.get(&expr).and_then(|v| v.as_arr()).and_then(|a| a.get(iter as usize)) {
+                                self.vars.insert("loop_item".to_string(), item.clone());
+                            }
+                        }
+                        match body {
+                            Some(b) => self.pc = Some(b.clone()),
+                            None => {
+                                self.loops.pop();
+                                return Event::Halt { reason: format!("循环块 {} 没有 body 连线", pc) };
+                            }
+                        }
+                    } else {
+                        self.loops.pop();
+                        self.pc = next;
+                    }
                 }
                 NodeKind::Audio { key, path, kind, looping, volume, next } => {
                     self.push_snapshot();
@@ -756,6 +811,15 @@ impl Vm {
             vars.set(k, v.clone());
         }
         o.set("vars", vars);
+        o.set(
+            "loops",
+            Json::Arr(self.loops.iter().map(|f| {
+                let mut fo = Json::obj();
+                fo.set("node", Json::s(f.node.clone()));
+                fo.set("iter", Json::n(f.iter as f64));
+                fo
+            }).collect()),
+        );
         let stack = Json::Arr(self.stack.iter().map(|s| match s {
             Some(x) => Json::s(x.clone()),
             None => Json::Null,
@@ -797,6 +861,15 @@ impl Vm {
                 self.vars.insert(k.clone(), v.clone());
             }
         }
+        self.loops = j
+            .arr_or_empty("loops")
+            .iter()
+            .filter_map(|v| {
+                let node = v.get("node")?.as_str()?.to_string();
+                let iter = v.get("iter")?.as_f64()? as u64;
+                Some(LoopFrame { node, iter })
+            })
+            .collect();
         self.stack = j
             .arr_or_empty("stack")
             .iter()
@@ -864,7 +937,7 @@ fn set_path(obj: &mut Json, parts: &[&str], v: Json) {
 
 #[cfg(test)]
 mod tests {
-    use crate::graph::AudioKind;
+    use crate::graph::{AudioKind, Effect, LoopKind, Op};
     use super::*;
     use crate::graph::{Choice, Node, Story};
 
@@ -914,6 +987,53 @@ mod tests {
         s.node_mut("s2").unwrap().set_port("next", Some("e1".into()));
         s.node_mut("s3").unwrap().set_port("next", Some("e1".into()));
         s
+    }
+
+    #[test]
+    fn loop_count_foreach_and_max_iters() {
+        // count 3：body 每次 n+1，尾连回循环块
+        let mut s = Story::new("t", "lp");
+        s.add_node(Node { id: "lp".into(), x: 0.0, y: 0.0, title: None,
+            kind: NodeKind::Loop { kind: LoopKind::Count, expr: "3".into(),
+                body: Some("b".into()), next: Some("e".into()), max_iters: 100 } });
+        s.add_node(Node { id: "b".into(), x: 0.0, y: 0.0, title: None,
+            kind: NodeKind::Set { effects: vec![Effect::new("n", Op::Add, "1")], next: Some("lp".into()) } });
+        s.add_node(Story::mk_end("e", 0.0, 0.0, "g", "完"));
+        s.vars.insert("n".into(), Json::n(0.0));
+        let mut vm = Vm::new(s);
+        assert!(matches!(vm.step(), Event::Ending { .. }));
+        assert_eq!(vm.vars.get("n").unwrap().as_f64(), Some(3.0));
+
+        // foreach：累加列表元素
+        let mut s2 = Story::new("t", "lp");
+        s2.add_node(Node { id: "lp".into(), x: 0.0, y: 0.0, title: None,
+            kind: NodeKind::Loop { kind: LoopKind::ForEach, expr: "list".into(),
+                body: Some("b".into()), next: Some("e".into()), max_iters: 100 } });
+        s2.add_node(Node { id: "b".into(), x: 0.0, y: 0.0, title: None,
+            kind: NodeKind::Set { effects: vec![Effect::new("sum", Op::Add, "loop_item")], next: Some("lp".into()) } });
+        s2.add_node(Story::mk_end("e", 0.0, 0.0, "g", "完"));
+        s2.vars.insert("sum".into(), Json::n(0.0));
+        s2.vars.insert("list".into(), Json::Arr(vec![Json::n(1.0), Json::n(2.0)]));
+        let mut vm2 = Vm::new(s2);
+        assert!(matches!(vm2.step(), Event::Ending { .. }));
+        assert_eq!(vm2.vars.get("sum").unwrap().as_f64(), Some(3.0));
+
+        // max_iters 防死循环：count 999 但上限 5
+        let mut s3 = Story::new("t", "lp");
+        s3.add_node(Node { id: "lp".into(), x: 0.0, y: 0.0, title: None,
+            kind: NodeKind::Loop { kind: LoopKind::Count, expr: "999".into(),
+                body: Some("b".into()), next: Some("e".into()), max_iters: 5 } });
+        s3.add_node(Node { id: "b".into(), x: 0.0, y: 0.0, title: None,
+            kind: NodeKind::Set { effects: vec![Effect::new("n", Op::Add, "1")], next: Some("lp".into()) } });
+        s3.add_node(Story::mk_end("e", 0.0, 0.0, "g", "完"));
+        s3.vars.insert("n".into(), Json::n(0.0));
+        let mut vm3 = Vm::new(s3);
+        assert!(matches!(vm3.step(), Event::Ending { .. }));
+        assert_eq!(vm3.vars.get("n").unwrap().as_f64(), Some(5.0));
+        // 存档应保留循环栈（此处已退出=空），读档不报错
+        let saved = vm3.save_json();
+        let mut vm4 = Vm::new(Story::new("t", "lp"));
+        assert!(vm4.load(&saved).is_ok());
     }
 
     #[test]

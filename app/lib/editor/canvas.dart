@@ -24,7 +24,11 @@ List<String> nodePorts(StoryNode n) {
     case NodeType.character:
     case NodeType.portrait:
     case NodeType.background:
+    case NodeType.image:
+    case NodeType.audio:
       return const ['next'];
+    case NodeType.loopBlock:
+      return const ['body', 'next'];
     case NodeType.branch:
       return const ['yes', 'no'];
     case NodeType.choice:
@@ -37,8 +41,6 @@ List<String> nodePorts(StoryNode n) {
     case NodeType.value:
     case NodeType.variable:
     case NodeType.weighted:
-    case NodeType.image:
-    case NodeType.audio:
     case NodeType.end:
       return const [];
   }

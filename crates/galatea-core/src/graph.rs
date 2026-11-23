@@ -294,6 +294,16 @@ pub enum NodeKind {
         volume: f64,
         next: Option<String>,
     },
+    /// 循环块：body 端口连出去的子图被反复执行；子图尾节点连回本块 = 下一次迭代。
+    /// kind 决定判定方式、expr 提供计数/条件/列表变量 —— 三种模式共用一套帧栈，
+    /// 新增模式只需加 LoopKind 变体 + VM 一个 match 臂，扩展点集中。
+    Loop {
+        kind: LoopKind,
+        expr: String,
+        body: Option<String>,
+        next: Option<String>,
+        max_iters: u64,
+    },
 }
 
 /// 音频用途：BGM 循环铺底 / Sfx 一次性音效 / Voice 台词配音
@@ -324,6 +334,31 @@ impl AudioKind {
     }
 }
 
+/// 循环判定模式：Count=expr 为次数 / While=expr 为条件 / ForEach=expr 为列表变量名
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LoopKind {
+    Count,
+    While,
+    ForEach,
+}
+
+impl LoopKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            LoopKind::Count => "count",
+            LoopKind::While => "while",
+            LoopKind::ForEach => "foreach",
+        }
+    }
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "while" => LoopKind::While,
+            "foreach" => LoopKind::ForEach,
+            _ => LoopKind::Count,
+        }
+    }
+}
+
 impl NodeKind {
     pub fn type_name(&self) -> &'static str {
         match self {
@@ -345,6 +380,7 @@ impl NodeKind {
             NodeKind::Weighted { .. } => "weighted",
             NodeKind::Image { .. } => "image",
             NodeKind::Audio { .. } => "audio",
+            NodeKind::Loop { .. } => "loop",
         }
     }
 
@@ -364,6 +400,7 @@ impl NodeKind {
             NodeKind::Background { .. } => "#68d5ba",
             NodeKind::Image { .. } => "#5ec8d8",
             NodeKind::Audio { .. } => "#f7c948",
+            NodeKind::Loop { .. } => "#ff9f43",
             NodeKind::Label { .. } => "#ffffff",
             NodeKind::Value { .. } => "#8fbcbb",
             NodeKind::Variable { .. } => "#a3be8c",
@@ -433,6 +470,14 @@ impl Node {
             | NodeKind::Label { next, .. }
             | NodeKind::Image { next, .. }
             | NodeKind::Audio { next, .. } => {
+                if let Some(n) = next {
+                    v.push(("next".to_string(), n.clone()));
+                }
+            }
+            NodeKind::Loop { body, next, .. } => {
+                if let Some(b) = body {
+                    v.push(("body".to_string(), b.clone()));
+                }
                 if let Some(n) = next {
                     v.push(("next".to_string(), n.clone()));
                 }
@@ -524,6 +569,8 @@ impl Node {
             (NodeKind::Background { next, .. }, "next") => *next = target,
             (NodeKind::Image { next, .. }, "next") => *next = target,
             (NodeKind::Audio { next, .. }, "next") => *next = target,
+            (NodeKind::Loop { body, .. }, "body") => *body = target,
+            (NodeKind::Loop { next, .. }, "next") => *next = target,
             (NodeKind::Label { next, .. }, "next") => *next = target,
             (NodeKind::Variable { add, .. }, "add") => match target {
                 Some(t) => {
@@ -925,6 +972,13 @@ impl Story {
                 o.set("volume", Json::Num(*volume));
                 opt(next, "next", &mut o);
             }
+            NodeKind::Loop { kind, expr, body, next, max_iters } => {
+                o.set("kind", Json::s(kind.as_str()));
+                o.set("expr", Json::s(expr.clone()));
+                opt(body, "body", &mut o);
+                opt(next, "next", &mut o);
+                o.set("maxIters", Json::n(*max_iters as f64));
+            }
         }
         o
     }
@@ -1170,6 +1224,13 @@ impl Story {
                     path: nj.s_or("path", ""),
                     label: nj.opt_str("label").filter(|s| !s.is_empty()),
                     next: nj.opt_str("next").filter(|s| !s.is_empty()),
+                },
+                "loop" => NodeKind::Loop {
+                    kind: LoopKind::from_str(&nj.s_or("kind", "count")),
+                    expr: nj.s_or("expr", "0"),
+                    body: nj.opt_str("body").filter(|s| !s.is_empty()),
+                    next: nj.opt_str("next").filter(|s| !s.is_empty()),
+                    max_iters: nj.num_or("maxIters", 1000.0) as u64,
                 },
                 "audio" => {
                     let kind = AudioKind::from_str(&nj.s_or("kind", "bgm"));

@@ -12,7 +12,7 @@ enum NodeType { say, choice, branch, set, jump, call, ret, end, script,
   // v0.2：资源方块 + 标记名/显示名
   character, portrait, background, marker, label,
   // v0.3 加权（值块 / 变量块 / 加权分支）
-  value, variable, weighted, image, audio }
+  value, variable, weighted, image, audio, loopBlock }
 
 String nodeTypeId(NodeType t) {
   switch (t) {
@@ -54,6 +54,8 @@ String nodeTypeId(NodeType t) {
       return 'image';
     case NodeType.audio:
       return 'audio';
+    case NodeType.loopBlock:
+      return 'loop';
   }
 }
 
@@ -95,6 +97,8 @@ NodeType nodeTypeFrom(String? s) {
       return NodeType.image;
     case 'audio':
       return NodeType.audio;
+    case 'loop':
+      return NodeType.loopBlock;
     default:
       return NodeType.say;
   }
@@ -140,6 +144,8 @@ String nodeTypeLabel(NodeType t) {
       return '图块';
     case NodeType.audio:
       return '音频';
+    case NodeType.loopBlock:
+      return '循环';
   }
 }
 
@@ -183,6 +189,8 @@ String nodeTypeIcon(NodeType t) {
       return '🖼';
     case NodeType.audio:
       return '🔊';
+    case NodeType.loopBlock:
+      return '🔁';
   }
 }
 
@@ -394,6 +402,12 @@ class StoryNode {
   // 加权分支
   List<WeightedBranch> branches;
 
+  // 循环块
+  String loopKind; // count | while | foreach
+  String loopExpr;
+  String? loopBody;
+  int loopMax;
+
   // 音频块（image 复用 tag=key / asset=path / text=label）
   String audioKind; // bgm | sfx | voice
   bool audioLoop;
@@ -452,6 +466,10 @@ class StoryNode {
     this.character,
     this.expr,
     this.scene,
+    this.loopKind = 'count',
+    this.loopExpr = '0',
+    this.loopBody,
+    this.loopMax = 1000,
     this.audioKind = 'bgm',
     this.audioLoop = true,
     this.audioVolume = 1.0,
@@ -512,6 +530,10 @@ class StoryNode {
       character: asOptString(m['character']),
       expr: asOptString(m['expr']),
       scene: asOptString(m['scene']),
+      loopKind: asString(m['kind'], fallback: 'count'),
+      loopExpr: asString(m['expr'], fallback: '0'),
+      loopBody: asOptString(m['body']),
+      loopMax: (m['maxIters'] is num) ? (m['maxIters'] as num).toInt() : 1000,
       audioKind: asString(m['kind'], fallback: 'bgm'),
       audioLoop: m['loop'] is bool ? m['loop'] as bool : asString(m['kind'], fallback: 'bgm') == 'bgm',
       audioVolume: (m['volume'] is num) ? (m['volume'] as num).toDouble() : 1.0,
@@ -568,6 +590,13 @@ class StoryNode {
         m['path'] = asset ?? '';
         if (text.isNotEmpty) m['label'] = text;
         if (next != null && next!.isNotEmpty) m['next'] = next;
+        break;
+      case NodeType.loopBlock:
+        m['kind'] = loopKind;
+        m['expr'] = loopExpr;
+        if (loopBody != null && loopBody!.isNotEmpty) m['body'] = loopBody;
+        if (next != null && next!.isNotEmpty) m['next'] = next;
+        m['maxIters'] = loopMax;
         break;
       case NodeType.audio:
         m['key'] = tag ?? '';
@@ -653,6 +682,10 @@ class StoryNode {
         tag: tag,
         varAdd: List<String>.from(varAdd),
         branches: branches.map((b) => b.copy()).toList(),
+        loopKind: loopKind,
+        loopExpr: loopExpr,
+        loopBody: loopBody,
+        loopMax: loopMax,
         audioKind: audioKind,
         audioLoop: audioLoop,
         audioVolume: audioVolume,
@@ -690,6 +723,10 @@ class StoryNode {
         break;
       case NodeType.set:
       case NodeType.script:
+        add('next', next);
+        break;
+      case NodeType.loopBlock:
+        add('body', loopBody);
         add('next', next);
         break;
       case NodeType.value:
@@ -761,6 +798,10 @@ class StoryNode {
       if (i != null && i >= 0 && i < branches.length) {
         branches[i].to = t ?? '';
       }
+      return;
+    }
+    if (port == 'body') {
+      loopBody = t;
       return;
     }
     if (port == 'add') {
@@ -866,6 +907,8 @@ class StoryNode {
         return varAdd.isEmpty ? '${text}（没连值块）' : '${text} ← ${varAdd.length} 个值';
       case NodeType.image:
         return text.isEmpty ? (asset ?? '（图块）') : '$text · ${asset ?? ''}';
+      case NodeType.loopBlock:
+        return '循环 [${loopKind}] ${loopExpr}';
       case NodeType.audio:
         return '${tag ?? '音频'} [${audioKind}] ${asset ?? ''}';
       case NodeType.weighted:

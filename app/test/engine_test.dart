@@ -51,6 +51,18 @@ void main() {
   });
 
   group('VM', () {
+    test('循环块 count 迭代 body 后退出', () {
+      final s = Story(title: 't', start: 'lp');
+      s.vars['n'] = 0;
+      s.nodes.addAll([
+        StoryNode(id: 'lp', type: NodeType.loopBlock, loopKind: 'count', loopExpr: '3', loopBody: 'b', next: 'e'),
+        StoryNode(id: 'b', type: NodeType.set, effects: [Effect(target: 'n', op: EffectOp.add, expr: '1')], next: 'lp'),
+        StoryNode(id: 'e', type: NodeType.end, ending: 'g'),
+      ]);
+      final vm = Vm(s);
+      expect(vm.step(), isA<EndingEvent>());
+      expect(vm.varValue('n'), 3);
+    });
     test('分支完成度: 断头分支不算完成', () {
       final s = Story(title: 't', start: 'a');
       s.nodes.addAll([

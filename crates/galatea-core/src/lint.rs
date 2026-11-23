@@ -96,6 +96,20 @@ pub fn lint(story: &Story) -> Vec<Issue> {
             }
         }
         match &n.kind {
+            NodeKind::Loop { expr, body, max_iters, .. } => {
+                if expr.trim().is_empty() {
+                    out.push(Issue { level: Level::Error, node: Some(n.id.clone()), kind: "loop-expr",
+                        msg: "循环块缺少 expr（次数/条件/列表变量名）".into() });
+                }
+                if body.is_none() {
+                    out.push(Issue { level: Level::Error, node: Some(n.id.clone()), kind: "loop-body",
+                        msg: "循环块没有 body 连线。怎么修：从 body 端口拖线到要循环的子图入口".into() });
+                }
+                if *max_iters == 0 {
+                    out.push(Issue { level: Level::Error, node: Some(n.id.clone()), kind: "loop-max",
+                        msg: "maxIters 为 0，循环一次都不会跑".into() });
+                }
+            }
             NodeKind::Image { key, path, .. } => {
                 if key.trim().is_empty() {
                     out.push(Issue { level: Level::Error, node: Some(n.id.clone()), kind: "image-key",

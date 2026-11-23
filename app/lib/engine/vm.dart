@@ -104,14 +104,21 @@ class _Pending {
   _Pending(this.node, this.prompt, this.options, this.originals);
 }
 
+class _LoopFrame {
+  final String node;
+  int iter;
+  _LoopFrame(this.node, this.iter);
+}
+
 class _Snap {
   final String? pc;
+  final List<_LoopFrame> loops;
   final Map<String, Object?> vars;
   final List<String?> stack;
   final Map<String, int> visited;
   final Set<String> taken;
   final int logLen;
-  _Snap(this.pc, this.vars, this.stack, this.visited, this.taken, this.logLen);
+  _Snap(this.pc, this.loops, this.vars, this.stack, this.visited, this.taken, this.logLen);
 }
 
 const int _maxSnapshots = 256;
@@ -127,6 +134,7 @@ class Vm {
   final Set<String> taken = <String>{};
   final List<String> log = <String>[];
   final List<_Snap> _snapshots = <_Snap>[];
+  final List<_LoopFrame> loops = <_LoopFrame>[];
   _Pending? _pending;
   String? endedEnding;
   String? endedText;
@@ -147,6 +155,7 @@ class Vm {
     taken.clear();
     log.clear();
     _snapshots.clear();
+    loops.clear();
     _pending = null;
     endedEnding = null;
     endedText = null;
@@ -240,6 +249,7 @@ class Vm {
     if (_snapshots.length >= _maxSnapshots) _snapshots.removeAt(0);
     _snapshots.add(_Snap(
       pc,
+      loops.map((f) => _LoopFrame(f.node, f.iter)).toList(),
       Map<String, Object?>.from(vars),
       List<String?>.from(stack),
       Map<String, int>.from(visited),
@@ -255,6 +265,9 @@ class Vm {
     _snapshots.removeLast(); // 当前停顿点
     final s = _snapshots.removeLast(); // 目标停顿点
     pc = s.pc;
+    loops
+      ..clear()
+      ..addAll(s.loops);
     vars = s.vars;
     stack
       ..clear()
@@ -445,6 +458,46 @@ class Vm {
           // 资源 / 标记方块：不进演出流程，直接跳过
           pc = node.next;
           break;
+        case NodeType.loopBlock:
+          _pushSnapshot();
+          final reentry = loops.isNotEmpty && loops.last.node == id;
+          if (reentry) {
+            loops.last.iter++;
+          } else {
+            loops.add(_LoopFrame(id, 0));
+          }
+          final iter = loops.last.iter;
+          bool cont;
+          if (node.loopKind == 'while') {
+            final r = evalExpr(node.loopExpr, (n) => vars[n]);
+            cont = r == true || (r is num && r != 0);
+          } else if (node.loopKind == 'foreach') {
+            final list = vars[node.loopExpr];
+            cont = list is List && iter < list.length;
+          } else {
+            final c = evalExpr(node.loopExpr, (n) => vars[n]);
+            cont = iter < (c is num ? c.toInt() : 0);
+          }
+          if (iter >= node.loopMax) {
+            log.add('循环 $id 达到上限 ${node.loopMax}，强制退出');
+            loops.removeLast();
+            pc = node.next;
+          } else if (cont) {
+            vars['loop_index'] = iter;
+            if (node.loopKind == 'foreach') {
+              final list = vars[node.loopExpr];
+              if (list is List && iter < list.length) vars['loop_item'] = list[iter];
+            }
+            if (node.loopBody == null || node.loopBody!.isEmpty) {
+              loops.removeLast();
+              return HaltEvent('循环块 $id 没有 body 连线');
+            }
+            pc = node.loopBody;
+          } else {
+            loops.removeLast();
+            pc = node.next;
+          }
+          break;
         case NodeType.audio:
           pc = node.next;
           return AudioEvent(
@@ -528,6 +581,7 @@ class Vm {
 
   Map<String, dynamic> saveJson() => <String, dynamic>{
         'pc': pc,
+        'loops': loops.map((f) => {'node': f.node, 'iter': f.iter}).toList(),
         'vars': vars,
         'stack': stack,
         'visited': visited,
@@ -541,6 +595,12 @@ class Vm {
 
   void loadJson(Map<String, dynamic> j) {
     pc = j['pc'] as String?;
+    loops.clear();
+    if (j['loops'] is List) {
+      for (final e in (j['loops'] as List)) {
+        if (e is Map) loops.add(_LoopFrame('${e['node']}', (e['iter'] is num) ? (e['iter'] as num).toInt() : 0));
+      }
+    }
     vars = <String, Object?>{};
     if (j['vars'] is Map) {
       (j['vars'] as Map).forEach((k, v) => vars['$k'] = v);

@@ -398,6 +398,7 @@ class _EditorPageState extends State<EditorPage> {
       NodeType.weighted,
       NodeType.image,
       NodeType.audio,
+      NodeType.loopBlock,
     ];
     return Container(
       color: GColors.panel,

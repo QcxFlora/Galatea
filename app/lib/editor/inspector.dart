@@ -109,6 +109,35 @@ class Inspector extends StatelessWidget {
 
   List<Widget> _body(StoryNode node) {
     switch (node.type) {
+      case NodeType.loopBlock:
+        return [
+          DropdownButtonFormField<String>(
+            value: node.loopKind,
+            decoration: const InputDecoration(labelText: '循环模式'),
+            items: const [
+              DropdownMenuItem(value: 'count', child: Text('计数（expr=次数）')),
+              DropdownMenuItem(value: 'while', child: Text('条件（expr=布尔）')),
+              DropdownMenuItem(value: 'foreach', child: Text('遍历（expr=列表变量）')),
+            ],
+            onChanged: (v) {
+              node.loopKind = v ?? 'count';
+              onChanged();
+            },
+          ),
+          const SizedBox(height: 10),
+          _text('表达式', node.loopExpr, (v) {
+            node.loopExpr = v;
+            onChanged();
+          }, hint: 'count:次数 / while:条件 / foreach:列表变量名；循环内可用 loop_index、loop_item'),
+          const SizedBox(height: 10),
+          _text('最大迭代次数（防死循环）', node.loopMax.toString(), (v) {
+            node.loopMax = int.tryParse(v) ?? 1000;
+            onChanged();
+          }),
+          const SizedBox(height: 10),
+          const Text('从 body 端口拖线到要循环的子图入口；子图尾节点连回本循环块 = 下一次迭代。',
+              style: TextStyle(fontSize: 11, color: GColors.dim, height: 1.6)),
+        ];
       case NodeType.image:
         return [
           _text('资源标识 key', node.tag ?? '', (v) {
