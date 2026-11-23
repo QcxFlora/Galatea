@@ -39,24 +39,30 @@ def main(app_dir: str) -> int:
         s = re.sub(r'namespace\s*=\s*"[^"]*"', f'namespace = "{APP_ID}"', s)
         s = re.sub(r'applicationId\s*=\s*"[^"]*"', f'applicationId = "{APP_ID}"', s)
 
-        signing = '''
-    signingConfigs {
-        create("release") {
-            val propsFile = rootProject.file("key.properties")
-            if (propsFile.exists()) {
-                val props = java.util.Properties()
-                propsFile.inputStream().use { props.load(it) }
-                storeFile = file(props.getProperty("storeFile"))
-                storePassword = props.getProperty("storePassword")
-                keyAlias = props.getProperty("keyAlias")
-                keyPassword = props.getProperty("keyPassword")
-            }
-        }
-    }
-'''
+        # 用正则定位 buildTypes（不依赖缩进），在它前面插 signingConfigs
         if "signingConfigs" not in s:
-            # 插到 android { ... } 的最后（buildTypes 之前）
-            s = s.replace("    buildTypes {", signing + "\n    buildTypes {", 1)
+            m = re.search(r"^(\s*)buildTypes\s*\{", s, re.M)
+            if not m:
+                print("!! build.gradle.kts 里找不到 buildTypes", file=sys.stderr)
+                return 1
+            indent = m.group(1)
+            signing = (
+                f"{indent}signingConfigs {{\n"
+                f"{indent}    create(\"release\") {{\n"
+                f"{indent}        val propsFile = rootProject.file(\"key.properties\")\n"
+                f"{indent}        if (propsFile.exists()) {{\n"
+                f"{indent}            val props = java.util.Properties()\n"
+                f"{indent}            propsFile.inputStream().use {{ props.load(it) }}\n"
+                f"{indent}            storeFile = file(props.getProperty(\"storeFile\"))\n"
+                f"{indent}            storePassword = props.getProperty(\"storePassword\")\n"
+                f"{indent}            keyAlias = props.getProperty(\"keyAlias\")\n"
+                f"{indent}            keyPassword = props.getProperty(\"keyPassword\")\n"
+                f"{indent}        }}\n"
+                f"{indent}    }}\n"
+                f"{indent}}}\n\n"
+            )
+            s = s[: m.start()] + signing + s[m.start():]
+            print(f"✓ 插入 signingConfigs（缩进 {len(indent)} 空格）")
         # 用 release 签名替换模板里的 debug 签名
         s = re.sub(r'signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)',
                    'signingConfig = signingConfigs.getByName("release")', s)
