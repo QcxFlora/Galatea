@@ -1095,8 +1095,8 @@ class Story {
       'vars': vars,
       'nodes': nodes.map((n) => n.toJson()).toList(),
       'groups': groups,
-      'status': status,
     };
+    if (status.isNotEmpty) m['status'] = status;
     return m;
   }
 

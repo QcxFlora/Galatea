@@ -956,12 +956,17 @@ impl Story {
         }
         root.set("groups", groups);
         let mut st = Json::obj();
+        let mut any_status = false;
         for (id, v) in &self.status {
             if v != "todo" && !v.is_empty() {
                 st.set(id, Json::s(v.clone()));
+                any_status = true;
             }
         }
-        root.set("status", st);
+        // 空则省略，保持包体紧凑、也不给旧样例引入无谓 diff
+        if any_status {
+            root.set("status", st);
+        }
         root
     }
 
