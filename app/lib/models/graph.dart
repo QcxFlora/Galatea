@@ -522,7 +522,8 @@ class StoryNode {
         if (next != null && next!.isNotEmpty) m['next'] = next;
         break;
       case NodeType.value:
-        m['expr'] = text.isEmpty ? '1' : text;
+        // 值块的表达式统一走 expr 字段（与 fromJson / Rust Value{expr} 一致）
+        m['expr'] = (expr ?? '').isEmpty ? '1' : expr!;
         break;
       case NodeType.variable:
         m['name'] = text;
@@ -811,7 +812,8 @@ class StoryNode {
       case NodeType.label:
         return text.isEmpty ? '（显示名为空）' : text;
       case NodeType.value:
-        return text.isEmpty ? '（空值）' : '= $text';
+        final e = expr ?? '';
+        return e.isEmpty ? '（空值）' : '= $e';
       case NodeType.variable:
         return varAdd.isEmpty ? '${text}（没连值块）' : '${text} ← ${varAdd.length} 个值';
       case NodeType.weighted:
