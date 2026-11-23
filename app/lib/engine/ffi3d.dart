@@ -30,6 +30,7 @@ library;
 
 import 'dart:async';
 import 'dart:ffi' as ffi;
+import 'package:ffi/ffi.dart' show malloc, calloc;
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -145,20 +146,20 @@ class Gal3D {
     final n = _alloc(name);
     final k = _alloc(kind);
     _add(_h, n, k, x, y, z, sx, sy, sz, rgba);
-    ffi.malloc.free(n);
-    ffi.malloc.free(k);
+    malloc.free(n);
+    malloc.free(k);
   }
 
   void setPosition(String name, double x, double y, double z) {
     final n = _alloc(name);
     _setPos(_h, n, x, y, z);
-    ffi.malloc.free(n);
+    malloc.free(n);
   }
 
   void setRotation(String name, double rx, double ry, double rz) {
     final n = _alloc(name);
     _setRot(_h, n, rx, ry, rz);
-    ffi.malloc.free(n);
+    malloc.free(n);
   }
 
   void setCamera(double ex, double ey, double ez, double tx, double ty, double tz) {
@@ -184,7 +185,7 @@ class Gal3D {
 
   static ffi.Pointer<ffi.Uint8> _alloc(String s) {
     final bytes = Uint8List.fromList([...s.codeUnits, 0]);
-    final p = ffi.malloc.allocate<ffi.Uint8>(bytes.length);
+    final p = malloc.allocate<ffi.Uint8>(bytes.length);
     p.asTypedList(bytes.length).setAll(0, bytes);
     return p;
   }

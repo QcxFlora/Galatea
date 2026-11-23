@@ -10,6 +10,7 @@
 ///   3. **弹簧**：倾斜和抬升都由 [SpringBuilder] 驱动，不做硬切
 library;
 
+import 'package:flutter/scheduler.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
