@@ -14,7 +14,7 @@ Rust 核心 + Flutter 编辑器，把整部视觉小说当作一张可拖拽、�
 
 ![Galatea](https://img.shields.io/badge/Galatea-0.2.0-blue?style=for-the-badge&logo=rust&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-green?style=for-the-badge)
-![License](https://img.shields.io/badge/License-GPL%203.0-red?style=for-the-badge)
+![License](https://img.shields.io/badge/License-GPL%203.0%20%2B%20Commercial-red?style=for-the-badge)
 ![Rust](https://img.shields.io/badge/Rust-1.75%2B-blue?style=for-the-badge&logo=rust)
 ![Flutter](https://img.shields.io/badge/Flutter-3.22%2B-blue?style=for-the-badge&logo=flutter)
 
@@ -22,6 +22,10 @@ Rust 核心 + Flutter 编辑器，把整部视觉小说当作一张可拖拽、�
 [![Forks](https://img.shields.io/github/forks/QcxFlora/galatea?style=social)](https://github.com/QcxFlora/galatea)
 [![Issues](https://img.shields.io/github/issues/QcxFlora/galatea)](https://github.com/QcxFlora/galatea/issues)
 [![CI](https://github.com/QcxFlora/galatea/actions/workflows/ci.yml/badge.svg)](https://github.com/QcxFlora/galatea/actions/workflows/ci.yml)
+
+> **许可：双许可。** 引擎本体 GPL-3.0-or-later（社区版，做开源游戏免费自由）。
+> 用 Galatea 做**闭源游戏**须事先联系作者取得**书面商业许可** —— 见 [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md)。
+> 贡献须签 [CLA](CLA.md)。可行性与设计依据见 [docs/PLAN-0.3.md](docs/PLAN-0.3.md) 第六节。
 
 **动画手感致敬 [chhongzh/lilt](https://github.com/chhongzh/lilt) —— 所有会动的东西都由阻尼弹簧驱动。**
 
