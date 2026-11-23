@@ -277,7 +277,7 @@ ThemeData buildGalateaTheme(Brightness brightness) {
         textStyle: const TextStyle(fontSize: GType.caption, fontWeight: FontWeight.w600),
       ),
     ),
-    dialogTheme: const DialogThemeData(
+    dialogTheme: const DialogTheme(
       backgroundColor: GColors.panel,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
