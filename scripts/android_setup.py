@@ -96,26 +96,61 @@ def main(app_dir: str) -> int:
         s = re.sub(r'applicationId\s+"[^"]*"', f'applicationId "{APP_ID}"', s)
         s = re.sub(r'namespace\s+"[^"]*"', f'namespace "{APP_ID}"', s)
         if not re.search(r"signingConfigs\s*\{", s):
-            s = s.replace("    buildTypes {", '''    signingConfigs {
-        release {
-            def propsFile = rootProject.file('key.properties')
-            if (propsFile.exists()) {
-                def props = new Properties()
-                propsFile.withInputStream { props.load(it) }
-                storeFile file(props['storeFile'])
-                storePassword props['storePassword']
-                keyAlias props['keyAlias']
-                keyPassword props['keyPassword']
-            }
-        }
-    }
-
-    buildTypes {''', 1)
-        s = s.replace("signingConfig signingConfigs.debug", "signingConfig signingConfigs.release")
+            m = re.search(r"^(\s*)buildTypes\s*\{", s, re.M)
+            if not m:
+                print("!! build.gradle 里找不到 buildTypes", file=sys.stderr)
+                return 1
+            ind = m.group(1)
+            signing = (
+                f"{ind}signingConfigs {{\n"
+                f"{ind}    release {{\n"
+                f"{ind}        def propsFile = rootProject.file('key.properties')\n"
+                f"{ind}        if (!propsFile.exists()) {{\n"
+                f"{ind}            throw new GradleException('缺少 android/key.properties —— 先跑 python3 scripts/android_setup.py app')\n"
+                f"{ind}        }}\n"
+                f"{ind}        def props = new Properties()\n"
+                f"{ind}        propsFile.withInputStream {{ props.load(it) }}\n"
+                f"{ind}        def ks = file(props['storeFile'])\n"
+                f"{ind}        if (!ks.exists()) {{\n"
+                f"{ind}            throw new GradleException('keystore 不存在: ' + ks + ' —— 确认 signing/release.jks 在仓库里')\n"
+                f"{ind}        }}\n"
+                f"{ind}        storeFile ks\n"
+                f"{ind}        storePassword props['storePassword']\n"
+                f"{ind}        keyAlias props['keyAlias']\n"
+                f"{ind}        keyPassword props['keyPassword']\n"
+                f"{ind}    }}\n"
+                f"{ind}}}\n\n"
+            )
+            s = s[:m.start()] + signing + s[m.start():]
+            print(f"✓ 插入 signingConfigs（groovy，缩进 {len(ind)}）")
+        # 兼容 groovy 两种写法：signingConfig signingConfigs.debug / signingConfig = ...
+        s2 = re.sub(r'signingConfig\s*=?\s*signingConfigs\.debug',
+                    'signingConfig signingConfigs.release', s)
+        if s2 == s and 'signingConfigs.release' not in s:
+            # release 块里根本没有 signingConfig 行 → 补一行
+            s2 = re.sub(r'(release\s*\{)', r'\1\n            signingConfig signingConfigs.release', s, count=1)
+        s = s2
         gradle_groovy.write_text(s, encoding="utf-8")
         print("✓ build.gradle：包名 + release 签名")
     else:
         print("!! 找不到 build.gradle(.kts)", file=sys.stderr)
+        return 1
+
+    # ── 1b. 自检：改完必须真的生效，否则立刻失败（不带着错签/错包名去构建 6 分钟）
+    gfile = gradle_kts if gradle_kts.exists() else gradle_groovy
+    final = gfile.read_text(encoding="utf-8")
+    print(f"── gradle 自检（{gfile.name}）──")
+    for line in final.splitlines():
+        if any(k in line for k in ("applicationId", "namespace", "signingConfig", "storeFile", "keyAlias")):
+            print("   ", line.strip())
+    ok = True
+    if APP_ID not in final:
+        print("!! 包名没写进 gradle", file=sys.stderr); ok = False
+    if not re.search(r"signingConfigs\s*\{", final):
+        print("!! signingConfigs 块缺失", file=sys.stderr); ok = False
+    if not re.search(r'signingConfig\s*=?\s*signingConfigs\.(release|getByName\("release"\))', final):
+        print("!! release buildType 没接 release 签名", file=sys.stderr); ok = False
+    if not ok:
         return 1
 
     # ── 2. MainActivity 搬家

@@ -104,6 +104,30 @@ jobs:
         working-directory: app
         run: flutter build apk --release --no-tree-shake-icons --target-platform android-arm64 --dart-define=APP_VERSION=${{ env.VER }}
 
+      - name: 校验签名指纹 / 包名 / arm64（不符即失败，绝不发布错签包）
+        run: |
+          APK=app/build/app/outputs/flutter-apk/app-release.apk
+          echo "── 实际使用的 signingConfig ──"
+          grep -n "signingConfig" app/android/app/build.gradle* || true
+          FP=$(keytool -printcert -jarfile "$APK" | grep -oE 'SHA256: [A-F0-9:]+' | head -1 | sed 's/SHA256: //')
+          echo "APK 签名指纹: $FP"
+          WANT="DC:69:0C:61:75:99:56:43:46:53:1F:F2:53:4E:DB:89:6D:5B:D9:EA:6B:A9:8D:8D:71:C8:28:CF:FC:F8:6E:69"
+          if [ "$FP" != "$WANT" ]; then
+            echo "::error::签名指纹不符！必须是 signing/release.jks（galatea）。实际 $FP"
+            exit 1
+          fi
+          python3 - "$APK" <<'EOF'
+          import zipfile, sys, re
+          z = zipfile.ZipFile(sys.argv[1])
+          libs = {n.split('/')[1] for n in z.namelist() if n.endswith('.so')}
+          assert libs == {'arm64-v8a'}, f"native 库必须只有 arm64-v8a，实际 {libs}"
+          raw = z.read('AndroidManifest.xml')
+          names = set(re.findall(rb'com\.galatea\.[a-z]+', raw)) | set(re.findall(r'com\.galatea\.[a-z]+', raw.decode('utf-16-le', errors='ignore')))
+          assert b'com.galatea.studio' in raw or 'com.galatea.studio' in names, f"包名必须是 com.galatea.studio，实际 {names}"
+          print("✓ arm64-only ✓ 包名 com.galatea.studio")
+          EOF
+          echo "✓ 签名指纹与固定 keystore 一致"
+
       - name: 收集产物
         run: |
           mkdir -p out
