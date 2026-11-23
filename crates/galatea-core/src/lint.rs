@@ -100,7 +100,26 @@ pub fn lint(story: &Story) -> Vec<Issue> {
                     });
                 }
             }
-            NodeKind::Script { next, .. } => {
+            NodeKind::Script { engine, src, entry, next, .. } => {
+                if matches!(engine, crate::graph::ScriptEngine::Godot) {
+                    match src {
+                        None => out.push(Issue { level: Level::Error, node: Some(n.id.clone()),
+                            kind: "godot-src",
+                            msg: "Godot 脚本块没填引用路径（src）。怎么修：指定一个 .gd 文件，如 res://scripts/minigame.gd".into() }),
+                        Some(p) if p.trim().is_empty() => out.push(Issue { level: Level::Error, node: Some(n.id.clone()),
+                            kind: "godot-src",
+                            msg: "Godot 脚本块的引用路径是空的".into() }),
+                        Some(p) if !p.trim_end_matches('/').ends_with(".gd") => out.push(Issue { level: Level::Error, node: Some(n.id.clone()),
+                            kind: "godot-src",
+                            msg: format!("Godot 脚本引用应是 .gd 文件，实际 `{}`", p) }),
+                        _ => {}
+                    }
+                    if entry.trim().is_empty() {
+                        out.push(Issue { level: Level::Warning, node: Some(n.id.clone()),
+                            kind: "godot-entry",
+                            msg: "入口函数名为空，运行时会回落到 run()".into() });
+                    }
+                }
                 if next.is_none() {
                     out.push(Issue {
                         level: Level::Warning,
@@ -519,7 +538,7 @@ pub fn summary(issues: &[Issue]) -> (usize, usize, usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::graph::{Effect, NodeKind, Op, Story};
+    use crate::graph::{Effect, Node, NodeKind, Op, ScriptEngine, Story};
 
     #[test]
     fn clean_story_has_no_errors() {
@@ -579,6 +598,31 @@ mod tests {
             "{:?}",
             issues
         );
+    }
+
+    #[test]
+    fn godot_script_must_reference_a_gd_file() {
+        let mut s = Story::new("t", "a");
+        s.add_node(Node {
+            id: "a".into(), x: 0.0, y: 0.0, title: None,
+            kind: NodeKind::Script {
+                engine: ScriptEngine::Godot, code: None, src: None,
+                entry: "run".into(), next: Some("e".into()),
+            },
+        });
+        s.add_node(Story::mk_end("e", 0.0, 100.0, "good", "完"));
+        assert!(lint(&s).iter().any(|i| i.kind == "godot-src"),
+            "缺 src 必须报错，实际 {:?}", lint(&s));
+        s.node_mut("a").unwrap().kind = NodeKind::Script {
+            engine: ScriptEngine::Godot, code: None,
+            src: Some("scripts/x.txt".into()), entry: "run".into(), next: Some("e".into()),
+        };
+        assert!(lint(&s).iter().any(|i| i.kind == "godot-src"), "非 .gd 必须报错");
+        s.node_mut("a").unwrap().kind = NodeKind::Script {
+            engine: ScriptEngine::Godot, code: None,
+            src: Some("res://scripts/x.gd".into()), entry: "run".into(), next: Some("e".into()),
+        };
+        assert!(!lint(&s).iter().any(|i| i.kind == "godot-src"), "正确引用不该报 godot-src");
     }
 }
 

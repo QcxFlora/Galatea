@@ -1,3 +1,6 @@
+> ⚠️ **已废弃。** 本文描述的「单包共存 + headless Godot + GDExtension」方案未采用。
+> 现行方案见 [GODOT.md](GODOT.md)：Godot 由作者自行安装，Galatea 导出标准 Godot 工程。
+
 # 单包共存：一个 APK，一个显示层
 
 ## 结论先放这儿

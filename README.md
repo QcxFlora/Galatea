@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/icon.png" width="132" alt="Galatea">
+
 # Galatea
 
 **思维导图式 Galgame 引擎**
@@ -10,7 +12,7 @@ Rust 核心 + Flutter 编辑器，把整部视觉小说当作一张可拖拽、�
 
 [简体中文](README.md)
 
-![Galatea](https://img.shields.io/badge/Galatea-0.1.0-blue?style=for-the-badge&logo=rust&logoColor=white)
+![Galatea](https://img.shields.io/badge/Galatea-0.2.0-blue?style=for-the-badge&logo=rust&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Web%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-GPL%203.0-red?style=for-the-badge)
 ![Rust](https://img.shields.io/badge/Rust-1.75%2B-blue?style=for-the-badge&logo=rust)
@@ -22,6 +24,12 @@ Rust 核心 + Flutter 编辑器，把整部视觉小说当作一张可拖拽、�
 [![CI](https://github.com/QcxFlora/galatea/actions/workflows/ci.yml/badge.svg)](https://github.com/QcxFlora/galatea/actions/workflows/ci.yml)
 
 **动画手感致敬 [chhongzh/lilt](https://github.com/chhongzh/lilt) —— 所有会动的东西都由阻尼弹簧驱动。**
+
+**Godot 是「引用」，不是内置。** 剧情、变量、表达式、动画、2D 演出全部在 Galatea 本体里算完；
+脚本块选 `godot` 引擎时只存一个 `.gd` 文件引用。Godot 引擎本体由作者自行安装
+（[godotengine.org/download](https://godotengine.org/download)），用来编写和调试脚本。
+`galatea export-godot` 把剧情包、素材、引用的脚本和一套纯 GDScript 运行时
+打成一个可直接打开的 Godot 工程 —— 零扩展依赖，F5 就能跑。
 
 </div>
 

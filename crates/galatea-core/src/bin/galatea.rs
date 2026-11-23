@@ -40,6 +40,7 @@ fn main() {
         "pack" | "p" => cmd_pack(&file, &rest),
         "unpack" | "u" => cmd_unpack(&file, &rest),
         "info" | "i" => cmd_info(&file),
+        "export-godot" | "eg" => cmd_export_godot(&file, &rest),
         "help" | "-h" | "--help" => {
             usage();
             Ok(())
@@ -601,6 +602,139 @@ fn cmd_info(gal_path: &str) -> Result<(), String> {
             human(e.csize),
             e.ratio() * 100.0,
             if e.method == 1 { "deflate" } else { "原样" });
+    }
+    Ok(())
+}
+
+
+// ── 导出 Godot 项目 ──────────────────────────────────────────
+// Godot 引擎本体由作者自行安装（https://godotengine.org/download）。
+// Galatea 只负责：剧情/变量/动画在本体算好 → 打包 .gal → 连同引用的 .gd
+// 一起生成一个可直接打开的 Godot 项目。运行时是纯 GDScript，零扩展依赖。
+const RT_GALATEA: &str = include_str!("../../../../godot/runtime/galatea.gd");
+const RT_MAIN: &str = include_str!("../../../../godot/runtime/main.gd");
+
+const MAIN_TSCN: &str = r#"[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/main.gd" id="1"]
+
+[node name="Galatea" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+"#;
+
+fn project_godot(title: &str) -> String {
+    format!(r#"; Galatea 导出的 Godot 项目。用你自己安装的 Godot 4.2+ 打开即可运行。
+config_version=5
+
+[application]
+
+config/name="{title}"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.2", "GL Compatibility")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/handheld/orientation=0
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/canvas_textures/default_texture_filter=1
+"#)
+}
+
+fn cmd_export_godot(file: &str, args: &[String]) -> Result<(), String> {
+    use std::path::Path;
+    let opt = |keys: &[&str]| -> Option<String> {
+        args.iter().position(|a| keys.contains(&a.as_str()))
+            .and_then(|i| args.get(i + 1).cloned())
+    };
+    let out = opt(&["-o", "--out"]).unwrap_or_else(|| "godot-export".into());
+    let scripts_root = opt(&["--scripts", "-s"]).unwrap_or_else(|| ".".into());
+    let dir = Path::new(&out);
+    std::fs::create_dir_all(dir).map_err(|e| format!("建不了目录 {}：{}", out, e))?;
+
+    let story = load(file)?;
+    let title = story.meta.title.clone();
+
+    // 1) 剧情包：.gal 原样拷；.json 先打包（.gal 是唯一交付格式）
+    let pkg_path = dir.join("story.gal");
+    let pkg_bytes = if file.ends_with(".gal") {
+        std::fs::read(file).map_err(|e| format!("读不到 {}：{}", file, e))?
+    } else {
+        let src = std::fs::read_to_string(file).map_err(|e| format!("读不到 {}：{}", file, e))?;
+        let doc = galatea_core::json::parse(&src)?;
+        let mut files = std::collections::BTreeMap::new();
+        files.insert("doc".to_string(), galatea_core::compact::pack_str(&src)?.into_bytes());
+        let _ = doc;
+        gal::pack(&files)?
+    };
+    std::fs::write(&pkg_path, &pkg_bytes).map_err(|e| format!("写不了 story.gal：{}", e))?;
+
+    // 2) 运行时 + 场景 + 工程配置
+    let put = |rel: &str, data: &[u8]| -> Result<(), String> {
+        let p = dir.join(rel);
+        if let Some(par) = p.parent() {
+            std::fs::create_dir_all(par).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(&p, data).map_err(|e| format!("写不了 {}：{}", rel, e))
+    };
+    put("runtime/galatea.gd", RT_GALATEA.as_bytes())?;
+    put("scenes/main.gd", RT_MAIN.as_bytes())?;
+    put("scenes/main.tscn", MAIN_TSCN.as_bytes())?;
+    put("project.godot", project_godot(&title).as_bytes())?;
+
+    // 3) 素材：包里除 doc / 字符串池以外的条目，按原相对路径落盘
+    let arc = gal::parse(&pkg_bytes)?;
+    let mut assets = 0usize;
+    for e in &arc.entries {
+        // doc / 字符串池是剧情数据（已在 story.gal 里），.json 是打包时的源稿，都不是素材
+        if e.name == "doc" || e.name.starts_with("$gal/") || e.name.ends_with(".json") { continue; }
+        put(&e.name, &arc.read(&e.name)?)?;
+        assets += 1;
+    }
+
+    // 4) 脚本引用：逐个校验存在，缺了就报错（绝不静默跳过）
+    let mut scripts = 0usize;
+    for n in &story.nodes {
+        let (engine, src_rel) = match &n.kind {
+            galatea_core::graph::NodeKind::Script { engine, src, .. } => (engine, src),
+            _ => continue,
+        };
+        if !matches!(engine, galatea_core::graph::ScriptEngine::Godot) { continue; }
+        let rel = match src_rel {
+            Some(s) if !s.trim().is_empty() => s.clone(),
+            _ => return Err(format!("节点 `{}` 是 godot 脚本块但没填引用路径。\n  \
+                怎么修：在编辑器里给它指定一个 .gd 文件（相对项目根，如 scripts/minigame.gd）", n.id)),
+        };
+        // 引用路径可能写成 res://scripts/x.gd（Godot 风格），落盘时剥掉前缀
+        let rel_local = rel.trim_start_matches("res://").to_string();
+        let from = Path::new(&scripts_root).join(&rel_local);
+        if !from.is_file() {
+            return Err(format!("节点 `{}` 引用的脚本不存在：{}\n  \
+                怎么修：把 .gd 放到该路径，或用 --scripts <目录> 指定脚本根目录",
+                n.id, from.display()));
+        }
+        let data = std::fs::read(&from).map_err(|e| format!("读不了 {}：{}", from.display(), e))?;
+        put(&rel_local, &data)?;
+        scripts += 1;
+    }
+
+    println!("🎮 已导出 Godot 项目 → {}", out);
+    println!("   剧情包 story.gal   素材 {} 个   引用脚本 {} 个", assets, scripts);
+    println!("   下一步：用 Godot 4.2+ 打开 {}/project.godot，F5 运行，或「项目→导出」出游戏。", out);
+    if scripts == 0 {
+        println!("   （没有 godot 脚本块 —— 纯剧情，开箱即跑）");
     }
     Ok(())
 }
