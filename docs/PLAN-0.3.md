@@ -9,7 +9,7 @@
 
 | # | 事项 | 状态 | 验收标准 |
 |---|---|---|---|
-| L1 | APK 构建 | 🔧 `aa9211c` 固定 AGP 8.7.3 验证中 | Release 出现 arm64 包，签名指纹不变，包名 com.galatea.studio |
+| L1 | APK 构建 | 🔧 根因=最新Flutter要Gradle9.3.1与AGP8.x互斥；已固定Flutter3.24.5+AGP8.7.3+Gradle8.9，`bde5fae`验证中 | Release 出现 arm64 包，签名指纹不变，包名 com.galatea.studio |
 | L2 | Godot GDScript 运行时真机验证 | ⬜ sandbox 无 Godot SDK | 用 Godot 4.2+ 打开导出工程，F5 能播完 demo.gal |
 | L3 | 书柜视觉对照参考图 | ⬜ 见第四节 | 深色卡片浮浅底 + 黑胶囊 + 圆底座 + 线稿图标 |
 | L4 | 支线折叠渲染 | ⬜ groups 数据层已通，画布不画合并块 | 折叠组在画布渲染成一个合并方块，可展开 |
@@ -42,9 +42,9 @@ Image {
   新剧本一律用 image；lint 对 legacy 块给 Warning 提示迁移。
 
 ### 验收
-- ⬜ Rust：Image 变体 + 序列化往返 + lint（path 必填、key 唯一）+ 测试
-- ⬜ VM：say.art/bg 连 image 块能正确解析出 path
-- ⬜ Dart：NodeType.image + 模型往返 + inspector 面板 + 画布图标
+- ✅ Rust：Image 变体 + 序列化往返 + lint（path 必填、key 唯一）+ 测试
+- ✅ VM：say.art/bg 连 image 块能正确解析出 path
+- ✅ Dart：NodeType.image + 模型往返 + inspector 面板 + 画布图标
 - ⬜ 打包：image 的 path 指向的文件进 .gal，重复引用只存一份
 
 ---
@@ -73,9 +73,9 @@ enum AudioKind { Bgm, Sfx, Voice }
 - BGM 切换：新的 Bgm audio 块覆盖上一首；looping=false 的播完即止。
 
 ### 验收
-- ⬜ Rust：Audio + AudioKind + 序列化 + lint（path 必填、volume 范围）+ 测试
-- ⬜ VM：Event::Audio 正确发出，voice 端口解析
-- ⬜ Dart：NodeType.audio + 模型 + inspector（kind/loop/volume）+ 播放器音频输出
+- ✅ Rust：Audio + AudioKind + 序列化 + lint（path 必填、volume 范围）+ 测试
+- ✅ VM：Event::Audio 正确发出，voice 端口解析
+- ✅ Dart：NodeType.audio + 模型 + inspector（kind/loop/volume）+ 播放器音频输出
 - ⬜ 打包：音频文件进 .gal（已压缩格式原样存，不再 DEFLATE）
 
 ---
@@ -111,11 +111,11 @@ enum AudioKind { Bgm, Sfx, Voice }
 8. ⚠️ 背景缺淡彩纹理层次
 
 ### 验收
-- ⬜ 书柜卡片改深色渐变（#1E2749 → #2A2F5C），白标题 + 浅灰状态行
-- ⬜ 「最近记录」等标签改黑底白字胶囊
-- ⬜ 封面改多层斜切拼贴（≥3 层）
-- ⬜ 统计条：细体大数字 + 上方状态小字 + 竖线分隔
-- ⬜ 顶部：黑圆底 X + 中央纹章 + 右上编号
+- ✅ 书柜卡片改深色渐变（#1E2749 → #2A2F5C），白标题 + 浅灰状态行
+- ✅ 「最近记录」等标签改黑底白字胶囊
+- ✅ 封面改多层斜切拼贴（≥3 层）
+- ✅ 统计条：细体大数字 + 上方状态小字 + 竖线分隔
+- 🔧 顶部：黑圆底 X + 右上编号 ✅，中央纹章 ⬜
 - ⬜ 方块/物品列表用圆形底座 + 黑胶囊计数 + 青色标记
 - ⬜ 手绘线稿图标集（替换关键 Material Icons）
 
@@ -152,10 +152,10 @@ enum AudioKind { Bgm, Sfx, Voice }
 - 文档：README 增加分级说明。
 
 ### 验收
-- ⬜ capability.dart + 单测（host/mobile 能力表正确）
-- ⬜ 编辑器 mobile 无 godot 选项 / 无导出入口
-- ⬜ CLI export-godot 在 mobile 拒绝并写明修法
-- ⬜ lint mobile 下 godot 块报错
+- ✅ capability.dart + 单测（host/mobile 能力表正确）
+- ✅ 编辑器 mobile 无 godot 选项 / 无导出入口
+- ✅ CLI export-godot 在 mobile 拒绝并写明修法
+- ✅ lint mobile 下 godot 块报错
 - ⬜ 主机端全功能不受影响（回归测试）
 
 ---
@@ -200,9 +200,9 @@ D 把引擎本身改成「闭源需授权」的自定义许可 → 引擎**不�
 
 ### 落地文件
 - ⬜ `LICENSE`：保持 GPL-3.0 全文
-- ⬜ `COMMERCIAL-LICENSE.md`：闭源游戏须联系作者取得书面商业许可的说明 + 联系方式
-- ⬜ `CONTRIBUTING.md` + `CLA.md`：贡献者授权作者双许可
-- ⬜ `README.md` 许可证段：说明双许可（GPL 社区版 / 商业闭源版）
+- ✅ `COMMERCIAL-LICENSE.md`：闭源游戏须联系作者取得书面商业许可的说明 + 联系方式
+- ✅ `CONTRIBUTING.md` + `CLA.md`：贡献者授权作者双许可
+- ✅ `README.md` 许可证段：说明双许可（GPL 社区版 / 商业闭源版）
 - ⬜ 文件头 SPDX：`GPL-3.0-or-later OR LicenseRef-Galatea-Commercial`
 
 ---
