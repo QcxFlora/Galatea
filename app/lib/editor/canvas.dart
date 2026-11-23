@@ -510,8 +510,8 @@ class _NodeCard extends StatelessWidget {
           ),
           for (var i = 0; i < ports.length; i++)
             Positioned(
-              right: -12,
-              top: portCenterY(i, ports.length) - 12,
+              right: -20,
+              top: portCenterY(i, ports.length) - 20,
               child: _PortDot(
                 label: portLabel(ports[i]),
                 color: portColor(ports[i]),
@@ -556,8 +556,8 @@ class _PortDot extends StatelessWidget {
       onPanUpdate: (d) => onMove(d.globalPosition),
       onPanEnd: (d) => onEnd(d.globalPosition),
       child: SizedBox(
-        width: 26,
-        height: 24,
+        width: 40,
+        height: 40,
         child: Center(
           child: Container(
             width: 18,
